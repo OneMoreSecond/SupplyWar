@@ -3,13 +3,25 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from math import exp, log
+import json
+from math import exp, hypot, log
+from pathlib import Path
 
 
-DT_SECONDS = 0.1
-SIEGE_HALF_LIFE_SECONDS = 35.0
-ROAD_LATENCY_SECONDS = 3.0
-ROAD_THROUGHPUT_PER_SECOND = 1.0
+MAP_CONFIG = json.loads(
+    (Path(__file__).resolve().parents[4] / "maps" / "mvp.json").read_text()
+)
+MAP_SETTINGS = MAP_CONFIG["settings"]
+NODE_POSITIONS = {
+    node["id"]: (node["x"], node["y"]) for node in MAP_CONFIG["nodes"]
+}
+ROAD_WIDTHS = {
+    frozenset((road["a"], road["b"])): road["width"]
+    for road in MAP_CONFIG["roads"]
+}
+DT_SECONDS = MAP_SETTINGS["logicTickSeconds"]
+SIEGE_HALF_LIFE_SECONDS = MAP_SETTINGS["siegeHalfLifeSeconds"]
+ROAD_THROUGHPUT_PER_SECOND = MAP_SETTINGS["forcePerWidthUnit"]
 SIMULATION_SECONDS = 240.0
 
 
@@ -27,6 +39,8 @@ class Transport:
     source: str
     target: str
     owner: str
+    latency_seconds: float
+    throughput_per_second: float
     active: bool = True
     queued_force: list[tuple[float, float]] | None = None
 
@@ -38,6 +52,34 @@ class Transport:
         if nodes[self.target].owner == self.owner:
             return "support"
         return "attack"
+
+
+def map_node_id(node: str) -> str:
+    return {"player_base": "player-base", "enemy_base": "enemy-base"}.get(node, node)
+
+
+def route_latency_seconds(source: str, target: str) -> float:
+    source_x, source_y = NODE_POSITIONS[map_node_id(source)]
+    target_x, target_y = NODE_POSITIONS[map_node_id(target)]
+    return hypot(source_x - target_x, source_y - target_y) * MAP_SETTINGS[
+        "secondsPerDistanceUnit"
+    ]
+
+
+def route_throughput_per_second(source: str, target: str) -> float:
+    return ROAD_WIDTHS[frozenset((map_node_id(source), map_node_id(target)))] * MAP_SETTINGS[
+        "forcePerWidthUnit"
+    ]
+
+
+def start_transport(source: str, target: str, owner: str) -> Transport:
+    return Transport(
+        source,
+        target,
+        owner,
+        route_latency_seconds(source, target),
+        route_throughput_per_second(source, target),
+    )
 
 
 def deliver_due_force(
@@ -116,10 +158,10 @@ def dispatch_force(nodes: dict[str, Node], transports: list[Transport], now: flo
         source = nodes[transport.source]
         if source.owner != transport.owner:
             continue
-        sent_force = min(source.force, ROAD_THROUGHPUT_PER_SECOND * DT_SECONDS)
+        sent_force = min(source.force, transport.throughput_per_second * DT_SECONDS)
         source.force -= sent_force
         if sent_force > 0.0:
-            transport.queued_force.append((now + ROAD_LATENCY_SECONDS, sent_force))
+            transport.queued_force.append((now + transport.latency_seconds, sent_force))
 
 
 def produce_force(nodes: dict[str, Node]) -> None:
@@ -136,9 +178,9 @@ def run_intended_path() -> list[str]:
         "enemy_base": Node("enemy_base", "enemy", 85.0, 1.0, True),
     }
     transports = [
-        Transport("resource", "frontline", "enemy"),
-        Transport("enemy_base", "backup", "enemy"),
-        Transport("player_base", "resource", "player"),
+        start_transport("resource", "frontline", "enemy"),
+        start_transport("enemy_base", "backup", "enemy"),
+        start_transport("player_base", "resource", "player"),
     ]
     events: list[str] = []
     started_frontline_attack = False
@@ -151,7 +193,7 @@ def run_intended_path() -> list[str]:
         refresh_transports(nodes, transports)
 
         if nodes["resource"].owner == "player" and not started_frontline_attack:
-            transports.append(Transport("resource", "frontline", "player"))
+            transports.append(start_transport("resource", "frontline", "player"))
             started_frontline_attack = True
             events.append(f"{now:5.1f}s player starts resource -> frontline")
 
@@ -159,7 +201,7 @@ def run_intended_path() -> list[str]:
         refresh_transports(nodes, transports)
 
         if nodes["frontline"].owner == "player" and not started_base_attack:
-            transports.append(Transport("frontline", "enemy_base", "player"))
+            transports.append(start_transport("frontline", "enemy_base", "player"))
             started_base_attack = True
             events.append(f"{now:5.1f}s player starts frontline -> enemy_base")
 
@@ -179,9 +221,9 @@ def run_direct_assault() -> tuple[list[str], Node]:
         "enemy_base": Node("enemy_base", "enemy", 85.0, 1.0, True),
     }
     transports = [
-        Transport("resource", "frontline", "enemy"),
-        Transport("enemy_base", "backup", "enemy"),
-        Transport("player_base", "frontline", "player"),
+        start_transport("resource", "frontline", "enemy"),
+        start_transport("enemy_base", "backup", "enemy"),
+        start_transport("player_base", "frontline", "player"),
     ]
     events: list[str] = []
     for tick in range(int(SIMULATION_SECONDS / DT_SECONDS)):

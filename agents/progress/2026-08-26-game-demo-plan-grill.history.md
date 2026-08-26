@@ -284,3 +284,67 @@ agent: /root
 time: 2026-08-26 11:08:00
 
 Updated the review wording after the `AGENTS.md` edit so conflicts and obsolete details are recorded as resolved historical findings, not current design.
+
+---
+agent: /root
+time: 2026-08-26 13:12:00
+
+Implemented the MVP with Vite, TypeScript, Canvas 2D, JSON map data, and a deterministic 10 Hz simulation. Added five simulation tests and verified typecheck, tests, and production build.
+
+Ran two Chromium browser checks: the full hinted route reached victory at 148.2 simulation seconds, and drag/right-click successfully started then cancelled a player transport. Recorded the evidence and marked MVP implementation/validation complete.
+
+---
+agent: /root
+time: 2026-08-26 13:18:00
+
+Corrected road mechanics to derive latency from Canvas geometry and throughput from map-configured width, while retaining the calibrated 3-second and 1-force-per-second critical roads. Re-ran the full browser victory route and cancellation check successfully.
+
+Added a dedicated test for the 200-unit road length, 3-second derived latency, and width-derived 1-force-per-second throughput.
+
+---
+agent: /root
+time: 2026-08-26 13:20:00
+
+Audit found that the configured siege half-life lacked the agreed internal formula-plugin boundary. Added a `SiegeFormula` interface, registered exponential half-life formula, map-configured formula selection, validation, and a focused test.
+
+---
+agent: /root
+time: 2026-08-26 13:21:00
+
+Re-ran typecheck, all seven Vitest cases, production build, npm audit, and the full Chromium hinted-route playthrough after the siege-formula interface change. All checks passed and Chromium again reached enemy-base victory.
+
+Recorded a requirement-by-requirement completion audit and marked implementation, validation, and MVP acceptance criteria complete.
+
+---
+agent: /root
+time: 2026-08-26 13:21:30
+
+Renumbered the existing `AGENTS.md` review subsection after adding the completion audit, preserving unique Results subsection numbering.
+
+---
+agent: /root
+time: 2026-08-26 13:32:35
+
+Recorded the user-reported visual issues: active transport direction was unclear, and a held drag had no visible feedback.
+
+Updated the Canvas renderer to use animated source-to-target triangles on active roads. Added a dashed, arrowed drag preview, valid-destination ring, contextual release guidance, pointer capture, and cancellation cleanup. The scoped change preserves the existing transport and simulation rules.
+
+Validated with `npm run typecheck`, seven passing Vitest cases, and `npm run build`. A held Player Base → Enemy Resource interaction in headless Chromium displayed `Release to send forces to Enemy Resource.` and produced `agents/tmp/2026-08-26-game-demo-plan-grill/output/browser-drag-preview.png` as visual evidence.
+
+---
+agent: /root
+time: 2026-08-26 13:44:11
+
+Recorded the user correction: route triangles must follow the active transport direction, not a road's static endpoint order; all enemy nodes except the frontline must be far from the player base to make the intended space relationship visible.
+
+Changed active-road rendering to use `Transport.source` → `Transport.target`. Kept Player Base → Enemy Frontline at 200 units, and moved Enemy Resource, Enemy Backup, and Enemy Base to the distant rear area. This intentionally supersedes the earlier equal-critical-road-length decision.
+
+Updated the deterministic balance model to load the current JSON-map geometry per transport. It now predicts resource/frontline/base capture at 33.4/89.8/143.0 seconds and direct-frontline failure at 240 seconds. Re-ran seven Vitest cases, typecheck, production build, held-drag/cancellation browser checks, and the normal-speed full Chromium victory route; all passed.
+
+---
+agent: /root
+time: 2026-08-26 13:47:47
+
+Recorded the user request for a flavor level introduction: the enemy's strong frontline threatens the player base, but its supply line is vulnerable.
+
+Added that mission briefing above the existing direct tactical hint in `index.html`. The hint remains unchanged so the new narrative framing does not reduce onboarding clarity.

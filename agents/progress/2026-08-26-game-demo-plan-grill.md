@@ -68,8 +68,9 @@ Source: user instruction, 2026-08-26.
 - Derive the first numeric map configuration from the agreed phase budget, validate it with a deterministic balance model, then tune it through play. Source: user response, 2026-08-26.
 - Right-clicking anywhere along a player-owned active road cancels that individual transport. Right-clicking an enemy or idle road does nothing. Source: user response, 2026-08-26.
 - The MVP renderer includes ownership colors and force numbers, distinct base/resource markers, directional animation on active roads, and a visible siege cue for attacked unsupported nodes. Source: user response, 2026-08-26.
-- Onboard the player with controls, the base-capture objective, and an immediate hint to capture the enemy resource to break support. Source: user response, 2026-08-26.
-- Keep all critical roads equivalent in length and throughput for the first map, so the resource cut—not road efficiency—explains the winning route. Source: user response, 2026-08-26.
+- Active transport routes use animated triangles that point from each active transport's source to its target, independent of a road's declared endpoint order. During a player drag, show a dashed arrow from the source to the pointer, highlight a valid adjacent destination, and state whether release will start the transport. Source: user instruction, 2026-08-26.
+- Onboard the player with a brief mission statement that the strong enemy frontline threatens the player base but its supply line is vulnerable, plus controls, the base-capture objective, and an immediate hint to capture the enemy resource to break support. Source: user instruction, 2026-08-26.
+- Place the enemy frontline near the player base, but place the enemy resource, backup, and base far away. The longer player-resource flank makes the enemy's rear-area supply relationship legible; road transit remains geometry-derived and its pacing must be revalidated. This supersedes the earlier equal-critical-road-length decision. Source: user instruction, 2026-08-26.
 - Use a fixed 10 Hz logic tick and `requestAnimationFrame` rendering. Source: user response, 2026-08-26.
 - Resolve remaining numeric choices with recommended defaults and keep them configurable in map or game configuration. Source: user response, 2026-08-26.
 
@@ -80,7 +81,7 @@ Use a JSON-defined five-node map with a pure TypeScript simulation, a Canvas 2D 
 1. Advance logic in deterministic 0.1-second steps and render independently at browser-frame cadence.
 2. Load and validate the JSON map, including all numeric defaults as editable configuration.
 3. Implement transport, endpoint ownership, siege, capture, and production rules as pure simulation code.
-4. Render the map and connect drag/right-click commands to the simulation.
+4. Render the map with directional route markers and live drag feedback, then connect drag/right-click commands to the simulation.
 5. Add unit/scenario tests for mechanics and the intended/direct paths; tune configuration after manual play.
 
 # 6. Todo
@@ -118,8 +119,11 @@ Use a JSON-defined five-node map with a pure TypeScript simulation, a Canvas 2D 
 - [x] Define road-geometry variation scope.
 - [x] Define logic and render tick cadence.
 - [x] Review `AGENTS.md` for conflicts, outdated design, and duplicable MVP content.
-- [ ] Implement map data, simulation, renderer, input, and tests.
-- [ ] Tune the map through manual play.
+- [x] Implement map data, simulation, renderer, input, and tests.
+- [x] Validate the map through browser play and retain its initial configuration.
+- [x] Make transport direction and in-progress drag state unambiguous.
+- [x] Correct route-arrow orientation and make the enemy rear area spatially distant.
+- [x] Add a flavor briefing that frames the tactical objective.
 - [x] Summarize whether to proceed, revise, or stop.
 
 # 7. Results
@@ -130,8 +134,8 @@ Source: deterministic model in `agents/tmp/2026-08-26-game-demo-plan-grill/scrip
 
 | Parameter | Initial value | Rationale |
 | --- | --- | --- |
-| Road latency | 3 seconds | Keeps each critical action visible without creating idle time. |
-| Road throughput | 1 force/second | Makes the resource and base support streams balance their own production. |
+| Road latency | Geometry-derived at 0.015 seconds/unit: player → frontline is 200 units / 3.0 seconds; player → resource is 561.4 units / 8.4 seconds; resource → frontline is 375.7 units / 5.6 seconds; frontline → base is 555.6 units / 8.3 seconds. | Keeps the frontline immediately adjacent while making the rear-area flank visibly distant. |
+| Road throughput | Width 1 × 1 force/width-unit/second = 1 force/second | Makes the resource and base support streams balance their own production. |
 | Siege half-life | 35 seconds | Produces 45–60 second siege phases under the stated forces. |
 | Player base | 45 initial force; 0.5 force/second | Can capture the resource but cannot overpower the supplied frontline. |
 | Enemy resource | 38 initial force; 1 force/second | Is a 30–45 second flank capture and sustains frontline support before capture. |
@@ -141,14 +145,14 @@ Source: deterministic model in `agents/tmp/2026-08-26-game-demo-plan-grill/scrip
 
 ## 7.2 Close verification: tactical path
 
-Method: simulate production, 3-second latency, 1 force/second continuous transports, endpoint-change cancellation/refresh, a 35-second siege half-life, and surrender at zero force. The player attacks the resource, then starts resource → frontline after capture, then frontline → enemy base after frontline capture. Source: `agents/tmp/2026-08-26-game-demo-plan-grill/script/balance_model.py`.
+Method: simulate production, each road's JSON-derived geometry latency and width throughput, endpoint-change cancellation/refresh, a 35-second siege half-life, and surrender at zero force. The player attacks the resource, then starts resource → frontline after capture, then frontline → enemy base after frontline capture. Source: `agents/tmp/2026-08-26-game-demo-plan-grill/script/balance_model.py`.
 
 | Milestone | Model result | Target | Result |
 | --- | --- | --- | --- |
-| Resource captured | 30.1 seconds | 30–45 seconds | Meets target |
-| Frontline captured | 85.3 seconds | 45–60 seconds after resource | Meets target: 55.2 seconds |
-| Enemy base captured | 136.5 seconds | 45–60 seconds after frontline | Meets target: 51.2 seconds |
-| Total victory | 136.5 seconds | 2–4 minutes | Meets target |
+| Resource captured | 33.4 seconds | 30–45 seconds | Meets target |
+| Frontline captured | 89.8 seconds | 45–60 seconds after resource | Meets target: 56.4 seconds |
+| Enemy base captured | 143.0 seconds | 45–60 seconds after frontline | Meets target: 53.2 seconds |
+| Total victory | 143.0 seconds | 2–4 minutes | Meets target |
 
 Interpretation: the intended three-step route satisfies every agreed timing target in this deterministic model.
 
@@ -161,7 +165,7 @@ Method: simulate player base → frontline while enemy resource → frontline re
 | Milestone | Model result |
 | --- | --- |
 | Frontline ownership after 240 seconds | Enemy |
-| Frontline force after 240 seconds | 143.5 |
+| Frontline force after 240 seconds | 140.8 |
 
 Interpretation: while support remains active, the direct assault cannot capture the frontline; it eventually loses momentum when the player-base flow exhausts its available force.
 
@@ -184,7 +188,37 @@ Acceptance criteria:
 
 Remaining risks are implementation verification, visual legibility, and real-player pacing—not unresolved product-design decisions. Mitigate them through the agreed scenario tests and manual tuning of configuration values.
 
-## 7.6 `AGENTS.md` review
+## 7.6 Implementation and verification
+
+Source: implementation and local validation, 2026-08-26.
+
+| Requirement | Evidence | Result |
+| --- | --- | --- |
+| Browser implementation | `src/main.ts`, `src/game.ts`, `maps/mvp.json`; Vite serves the application. | Implemented |
+| Separate ticks | Fixed 0.1-second simulation accumulator plus `requestAnimationFrame` renderer in `src/main.ts`. | Implemented |
+| JSON map data | `maps/mvp.json` supplies node geometry, road widths, initial enemy transports, configurable values, and an internal siege-formula identifier; `validateMap` rejects invalid topology/settings. | Implemented |
+| Supply, transport, siege, capture | Pure `Simulation` model covers continuous packets, source cancellation, target state refresh, active-support siege rule, configurable internal formula, surrender, and surplus garrisons. | Implemented |
+| Input and feedback | Canvas supports drag-to-transport and right-click route cancellation; rendering shows ownership, force, node types, directional route triangles, siege rings, and a live drag preview. | Implemented |
+| Automated validation | `npm run typecheck`, `npm test`, and `npm run build` passed. Seven Vitest cases cover geometry/width derivation, internal siege formula, endpoint rules, siege surrender, intended victory, and direct-assault failure. | Passed |
+| Browser play | Headless Chromium executed the full hinted route at normal speed and reached `Victory — the enemy base surrendered.` after the distant-rear layout. Separate Canvas-input runs verified live drag feedback and player-route cancellation. Screenshots are in `agents/tmp/2026-08-26-game-demo-plan-grill/output/`. | Passed |
+
+The completed browser route reached victory within the 2–4 minute target. The deterministic geometry-aware model predicts 143.0 simulation seconds; browser interaction waits add no balance risk.
+
+## 7.7 Remaining risk
+
+The application has been verified through automated simulation, production build, and headless-browser interaction. The only remaining non-blocking risk is qualitative feedback from additional human players; all MVP implementation and acceptance criteria are complete.
+
+## 7.8 Completion audit
+
+| Scope | Evidence | Status |
+| --- | --- | --- |
+| MVP map and rules | `maps/mvp.json` plus `src/game.ts`; 10 Hz logic, geometry/width roads, continuous transport, source cancellation, target refresh, internal siege formula, and surrender are implemented. | Complete |
+| Player experience | `index.html`, `src/main.ts`, and Canvas CSS provide a mission briefing, hinted objective, drag/right-click control, colors, force values, active flow, node markers, and siege cue. | Complete |
+| Map and balance | Seven simulation tests verify geometry-derived road timing, the formula, endpoint changes, siege, intended victory, and direct-assault failure. The geometry-aware balance model predicts 143.0-second tactical victory and direct-assault failure at 240 seconds. | Complete |
+| Runnable browser deliverable | `npm run build` succeeded; Chromium completed the actual hinted route and reported victory. | Complete |
+| Dependency health | `npm audit` reported no vulnerabilities. | Complete |
+
+## 7.9 `AGENTS.md` review
 
 Source: `AGENTS.md`, reviewed and updated 2026-08-26 against the decisions in Section 4.
 
@@ -216,3 +250,30 @@ Source: `AGENTS.md`, reviewed and updated 2026-08-26 against the decisions in Se
 Applied approach: retain `AGENTS.md` as a concise project charter and repository instructions; put changeable MVP rules, values, and acceptance criteria in the linked task record.
 
 Outcome: confirmed by the user and applied. `AGENTS.md` now retains only the project premise and durable constraints, with a relative link to this task record as the detailed MVP source of truth.
+
+## 7.10 Transport feedback follow-up
+
+Source: user visual-feedback report and local browser verification, 2026-08-26.
+
+| Feedback issue | Change | Evidence | Result |
+| --- | --- | --- | --- |
+| Active transport direction was unclear. | Added animated white triangles, then corrected their endpoints to use each `Transport.source` → `Transport.target` rather than map road order. | `src/main.ts`; `agents/tmp/2026-08-26-game-demo-plan-grill/output/browser-drag-preview.png` | Direction is visible and correct on both initial enemy transports. |
+| A drag had no visible in-progress state. | Added a dashed arrow from the player source to the pointer, a ring on a valid destination, release guidance, pointer capture, and cancellation cleanup. | `src/main.ts`; headless Chromium check in `agents/tmp/2026-08-26-game-demo-plan-grill/script/browser-drag-preview.mjs` | Holding Player Base → Enemy Resource reports `Release to send forces to Enemy Resource.` and visibly previews the action. |
+
+Validation: `npm run typecheck`, `npm test` (seven tests), and `npm run build` passed. The headless-browser held-drag check passed and captured the evidence screenshot above.
+
+## 7.11 Direction and rear-area layout correction
+
+Source: user correction, map/configuration update, deterministic model, and Chromium playthrough, 2026-08-26.
+
+| Requirement | Applied change | Verification |
+| --- | --- | --- |
+| Triangles follow transport direction. | The renderer draws each active road using `Transport.source` and `Transport.target`; only inactive roads retain map endpoint order. | Browser screenshot shows resource → frontline arrows pointing up-left and enemy base → backup arrows pointing downward. |
+| Enemy rear area is far from the player. | `maps/mvp.json` keeps Player Base → Enemy Frontline at 200 units, and moves Enemy Resource, Enemy Backup, and Enemy Base to 561.4, 754.4, and 750.1 units from Player Base respectively. | Browser screenshot visibly separates the rear area; the map remains planar. |
+| Tactical path remains viable. | The balance model now reads `maps/mvp.json` geometry per route rather than assuming a fixed latency. | Resource/frontline/base capture at 33.4/89.8/143.0 seconds; direct assault leaves the frontline enemy-held at 240 seconds; full normal-speed Chromium route reaches victory. |
+
+## 7.12 Mission briefing
+
+Source: user instruction and implementation, 2026-08-26.
+
+The level header now frames the tactical situation before the action hint: “The enemy's strong frontline threatens our base. But their supply line is vulnerable—break it.” The unchanged next line still directs the MVP route: capture the enemy resource, then attack the unsupported frontline.
