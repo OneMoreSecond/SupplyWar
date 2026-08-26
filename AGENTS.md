@@ -14,6 +14,6 @@ The key fun point is defeating a stronger but badly positioned enemy force with 
 
 Source: user-confirmed MVP review, 2026-08-26.
 
-The detailed MVP design, mechanics, map, balance values, acceptance criteria, and deferred scope are maintained in [the MVP plan](agents/progress/2026-08-26-game-demo-plan-grill.md).
+The detailed MVP design, mechanics, map, balance values, acceptance criteria, and deferred scope are maintained in the [formal MVP documentation set](doc/mvp/README.md).
 
-Use that plan as the source of truth for implementation. Update it when MVP decisions change.
+Use those documents as the source of truth for implementation. Update the relevant category document when MVP decisions change; retain the [progress record](agents/progress/2026-08-26-game-demo-plan-grill.md) as the decision and implementation history.

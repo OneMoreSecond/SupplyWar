@@ -73,6 +73,7 @@ Source: user instruction, 2026-08-26.
 - Place the enemy frontline near the player base, but place the enemy resource, backup, and base far away. The longer player-resource flank makes the enemy's rear-area supply relationship legible; road transit remains geometry-derived and its pacing must be revalidated. This supersedes the earlier equal-critical-road-length decision. Source: user instruction, 2026-08-26.
 - Use a fixed 10 Hz logic tick and `requestAnimationFrame` rendering. Source: user response, 2026-08-26.
 - Resolve remaining numeric choices with recommended defaults and keep them configurable in map or game configuration. Source: user response, 2026-08-26.
+- Maintain the current MVP specification as categorized formal documents under `doc/mvp/`; keep this progress record and side history as the decision and implementation trail. Source: user instruction, 2026-08-26.
 
 # 5. Design
 
@@ -124,6 +125,7 @@ Use a JSON-defined five-node map with a pure TypeScript simulation, a Canvas 2D 
 - [x] Make transport direction and in-progress drag state unambiguous.
 - [x] Correct route-arrow orientation and make the enemy rear area spatially distant.
 - [x] Add a flavor briefing that frames the tactical objective.
+- [x] Formalize the MVP reference by category and redirect root documentation links.
 - [x] Summarize whether to proceed, revise, or stop.
 
 # 7. Results
@@ -249,7 +251,7 @@ Source: `AGENTS.md`, reviewed and updated 2026-08-26 against the decisions in Se
 
 Applied approach: retain `AGENTS.md` as a concise project charter and repository instructions; put changeable MVP rules, values, and acceptance criteria in the linked task record.
 
-Outcome: confirmed by the user and applied. `AGENTS.md` now retains only the project premise and durable constraints, with a relative link to this task record as the detailed MVP source of truth.
+Outcome at the time: confirmed by the user and applied. The later formal-document migration in Section 7.13 supersedes this task record as the detailed MVP source of truth.
 
 ## 7.10 Transport feedback follow-up
 
@@ -277,3 +279,9 @@ Source: user correction, map/configuration update, deterministic model, and Chro
 Source: user instruction and implementation, 2026-08-26.
 
 The level header now frames the tactical situation before the action hint: “The enemy's strong frontline threatens our base. But their supply line is vulnerable—break it.” The unchanged next line still directs the MVP route: capture the enemy resource, then attack the unsupported frontline.
+
+## 7.13 Formal MVP documentation
+
+Source: user instruction and documentation implementation, 2026-08-26.
+
+The current MVP reference is now categorized under [`doc/mvp/`](../../doc/mvp/README.md): gameplay, user experience, map design, technology, and validation. Each document cites the user-confirmed decision record and applicable code or map-data source. `README.md` and `AGENTS.md` now direct readers to the formal index; this progress record and its side history remain the audit trail.

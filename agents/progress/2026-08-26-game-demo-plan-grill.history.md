@@ -348,3 +348,11 @@ time: 2026-08-26 13:47:47
 Recorded the user request for a flavor level introduction: the enemy's strong frontline threatens the player base, but its supply line is vulnerable.
 
 Added that mission briefing above the existing direct tactical hint in `index.html`. The hint remains unchanged so the new narrative framing does not reduce onboarding clarity.
+
+---
+agent: /root
+time: 2026-08-26 13:58:46
+
+Recorded the user request to summarize the progress record into formal categorized MVP documents and redirect root links there.
+
+Created `doc/mvp/README.md` as the index and formalized gameplay, user experience, map design, technology, and validation in separate documents. Redirected `README.md` and `AGENTS.md` to the formal documentation set. The progress record and append-only history remain the decision and implementation trail.
