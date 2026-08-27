@@ -11,11 +11,11 @@ describe("Supply War simulation", () => {
     const frontlineRoad = game.roadBetween("player-base", "frontline")!;
     const flankRoad = game.roadBetween("player-base", "resource")!;
     expect(game.roadLength(frontlineRoad)).toBeCloseTo(200, 2);
-    expect(game.travelSeconds(frontlineRoad)).toBeCloseTo(3, 2);
+    expect(game.travelSeconds(frontlineRoad)).toBeCloseTo(1.5, 2);
     expect(game.roadLength(flankRoad)).toBeGreaterThan(game.roadLength(frontlineRoad) * 2);
     expect(game.travelSeconds(flankRoad)).toBeGreaterThan(game.travelSeconds(frontlineRoad) * 2);
-    expect(game.throughput(frontlineRoad)).toBe(1);
-    expect(game.throughput(flankRoad)).toBe(1);
+    expect(game.throughput(frontlineRoad)).toBe(2);
+    expect(game.throughput(flankRoad)).toBe(2);
   });
 
   it("selects the configured internal siege formula", () => {
@@ -24,7 +24,7 @@ describe("Supply War simulation", () => {
     game.step();
     game.node("frontline").force = 70;
     game.startTransport("player-base", "frontline", "player");
-    game.step(35);
+    game.step(config.settings.siegeHalfLifeSeconds);
     expect(game.node("frontline").force).toBeCloseTo(35, 1);
   });
 

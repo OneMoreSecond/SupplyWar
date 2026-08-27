@@ -42,9 +42,9 @@ export const levels: readonly LevelDefinition[] = [
     kind: "tutorial",
     pickerLabel: "Tutorial 3 — Cut supply",
     mechanism: "SOURCE CAPTURE",
-    title: "Break the enemy supply line.",
-    briefing: "Capturing a route's source cancels that route and clears its in-flight force.",
-    hint: "Capture the Enemy Resource first; its support route will stop, opening the road to the base.",
+    title: "Choose the supply cut.",
+    briefing: "The direct road is tempting, but active enemy support makes that attack fail.",
+    hint: "Capture the Enemy Resource first. Its support will stop, then the supply road becomes your winning route.",
     config: cutSupply as MapConfig,
   },
   {

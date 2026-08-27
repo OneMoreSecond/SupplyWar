@@ -58,6 +58,23 @@ def map_node_id(node: str) -> str:
     return {"player_base": "player-base", "enemy_base": "enemy-base"}.get(node, node)
 
 
+def configured_nodes() -> dict[str, Node]:
+    nodes: dict[str, Node] = {}
+    for configured in MAP_CONFIG["nodes"]:
+        name = {
+            "player-base": "player_base",
+            "enemy-base": "enemy_base",
+        }.get(configured["id"], configured["id"])
+        nodes[name] = Node(
+            name,
+            configured["owner"],
+            configured["force"],
+            configured["production"],
+            configured["kind"] == "base",
+        )
+    return nodes
+
+
 def route_latency_seconds(source: str, target: str) -> float:
     source_x, source_y = NODE_POSITIONS[map_node_id(source)]
     target_x, target_y = NODE_POSITIONS[map_node_id(target)]
@@ -170,13 +187,7 @@ def produce_force(nodes: dict[str, Node]) -> None:
 
 
 def run_intended_path() -> list[str]:
-    nodes = {
-        "player_base": Node("player_base", "player", 45.0, 0.5, True),
-        "frontline": Node("frontline", "enemy", 70.0, 0.0),
-        "resource": Node("resource", "enemy", 38.0, 1.0),
-        "backup": Node("backup", "enemy", 80.0, 0.0),
-        "enemy_base": Node("enemy_base", "enemy", 85.0, 1.0, True),
-    }
+    nodes = configured_nodes()
     transports = [
         start_transport("resource", "frontline", "enemy"),
         start_transport("enemy_base", "backup", "enemy"),
@@ -213,13 +224,7 @@ def run_intended_path() -> list[str]:
 
 
 def run_direct_assault() -> tuple[list[str], Node]:
-    nodes = {
-        "player_base": Node("player_base", "player", 45.0, 0.5, True),
-        "frontline": Node("frontline", "enemy", 70.0, 0.0),
-        "resource": Node("resource", "enemy", 38.0, 1.0),
-        "backup": Node("backup", "enemy", 80.0, 0.0),
-        "enemy_base": Node("enemy_base", "enemy", 85.0, 1.0, True),
-    }
+    nodes = configured_nodes()
     transports = [
         start_transport("resource", "frontline", "enemy"),
         start_transport("enemy_base", "backup", "enemy"),

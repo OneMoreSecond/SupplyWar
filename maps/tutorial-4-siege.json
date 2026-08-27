@@ -3,12 +3,12 @@
   "settings": {
     "logicTickSeconds": 0.1,
     "siegeFormula": "exponential-half-life",
-    "siegeHalfLifeSeconds": 2.5,
-    "secondsPerDistanceUnit": 0.01,
-    "forcePerWidthUnit": 1
+    "siegeHalfLifeSeconds": 1.25,
+    "secondsPerDistanceUnit": 0.005,
+    "forcePerWidthUnit": 2
   },
   "nodes": [
-    { "id": "player-base", "label": "Your Small Force", "owner": "player", "force": 12, "production": 0.3, "kind": "base", "x": 180, "y": 280 },
+    { "id": "player-base", "label": "Your Small Force", "owner": "player", "force": 12, "production": 0.6, "kind": "base", "x": 180, "y": 280 },
     { "id": "enemy-base", "label": "Unsupported Fortress", "owner": "enemy", "force": 90, "production": 0, "kind": "base", "x": 720, "y": 280 }
   ],
   "roads": [

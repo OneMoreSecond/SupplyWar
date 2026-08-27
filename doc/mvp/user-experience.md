@@ -10,7 +10,7 @@ Normal play starts at Tutorial 1. Each tutorial names one focal mechanism and gi
 | --- | --- | --- | --- |
 | 1 | Send forces | Transport and capture | Drag from a player source to an adjacent hostile target and keep the route active |
 | 2 | Allied supply | Support | Feed the player base from a resource while the base attacks |
-| 3 | Cut supply | Source capture | Capture the enemy resource to cancel its active support route |
+| 3 | Cut supply | Source capture | Compare a failing direct assault with capturing the enemy resource to cancel support |
 | 4 | Siege | Unsupported attrition | Keep attacking a stronger unsupported base while its red siege ring is active |
 | 5 | Supply War MVP | Final exam | Combine flanking, source capture, support cutting, and siege |
 
@@ -68,4 +68,4 @@ The validation status states whether saving and playtesting are available and gi
 
 ## Final-exam play
 
-After the four tutorials, the player should recognize that the nearby strong frontline is dangerous, see the distant resource as its source of support, capture that resource through the long flank route, siege the frontline, and then take the enemy base. The target final-exam run remains 2–4 minutes. Source: user tutorial goal and user-confirmed pacing/map decisions in the game progress record.
+After the four tutorials, the player should recognize that the nearby strong frontline is dangerous, see the distant resource as its source of support, capture that resource through the long flank route, siege the frontline, and then take the enemy base. The adjusted intended final-exam route takes about 72 simulation seconds. Source: user tutorial review, authored balance values, and the current geometry-aware model.

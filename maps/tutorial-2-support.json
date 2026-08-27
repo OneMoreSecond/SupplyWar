@@ -3,13 +3,13 @@
   "settings": {
     "logicTickSeconds": 0.1,
     "siegeFormula": "exponential-half-life",
-    "siegeHalfLifeSeconds": 10000,
-    "secondsPerDistanceUnit": 0.01,
-    "forcePerWidthUnit": 1
+    "siegeHalfLifeSeconds": 5000,
+    "secondsPerDistanceUnit": 0.005,
+    "forcePerWidthUnit": 2
   },
   "nodes": [
-    { "id": "player-resource", "label": "Your Resource", "owner": "player", "force": 45, "production": 2, "kind": "resource", "x": 150, "y": 280 },
-    { "id": "player-base", "label": "Your Base", "owner": "player", "force": 5, "production": 0.2, "kind": "base", "x": 450, "y": 280 },
+    { "id": "player-resource", "label": "Your Resource", "owner": "player", "force": 45, "production": 4, "kind": "resource", "x": 150, "y": 280 },
+    { "id": "player-base", "label": "Your Base", "owner": "player", "force": 5, "production": 0.4, "kind": "base", "x": 450, "y": 280 },
     { "id": "enemy-base", "label": "Enemy Base", "owner": "enemy", "force": 22, "production": 0, "kind": "base", "x": 750, "y": 280 }
   ],
   "roads": [

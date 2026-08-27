@@ -60,6 +60,11 @@ try {
   await picker.selectOption("cut-supply");
   await page.waitForURL(/\?level=cut-supply$/);
   if (!await page.getByText(/TUTORIAL 3\/4 · SOURCE CAPTURE/).isVisible()) throw new Error("Level picker did not open Tutorial 3");
+  if (!await page.getByText(/direct road is tempting.*attack fail/i).isVisible()) throw new Error("Tutorial 3 does not explain the direct-attack choice");
+  await dragWorld(canvas, { x: 150, y: 260 }, { x: 750, y: 260 });
+  await page.waitForTimeout(300);
+  if (await next.isVisible()) throw new Error("Tutorial 3 direct attack completed the level");
+  await page.screenshot({ path: "agents/tmp/2026-08-27-tutorial-level-progression/output/tutorial-3-direct-fails.png", fullPage: true });
 
   await picker.selectOption("siege");
   await page.waitForURL(/\?level=siege$/);
@@ -99,7 +104,7 @@ try {
     pickerNavigation: "passed",
     finalExam: "mvp",
     playtestIsolation: "passed",
-    screenshots: ["tutorial-1-complete.png", "tutorial-4-siege.png", "final-exam.png"],
+    screenshots: ["tutorial-1-complete.png", "tutorial-3-direct-fails.png", "tutorial-4-siege.png", "final-exam.png"],
   }, null, 2));
 } finally {
   await browser.close();

@@ -16,3 +16,10 @@ agent: Codex
 time: 2026-08-27 07:42:58
 
 Completed the tutorial progression. Added four focused version-1 maps and an ordered catalog ending in the unchanged MVP map; added main-page level guidance, picker routing, Tutorial 1 default, and victory-only next-level navigation; and preserved editor playtest isolation. Updated maintained documentation and the requirement audit. Recorded passing typecheck, 22 tests, production build, diff check, the tutorial browser workflow, the existing editor/playtest regression workflow, and visual inspection of tutorial completion, active siege, and final exam.
+
+---
+
+agent: Codex
+time: 2026-08-27 10:48:59
+
+Completed the two review changes. Added Tutorial 3's triangular two-choice layout and narrow direct road; unit evidence proves the direct attack fails under support while the resource cut wins. Applied a uniform numeric 2x time scale across all tutorials and the MVP final exam, producing intended completion times of 2.4 / 7.2 / 10.7 / 7.3 / 71.8 seconds, each about half its preceding result. Updated level guidance, balance tooling, maintained docs, unit/browser coverage, screenshots, and the completion audit. Recorded passing typecheck, 23 tests, build, diff check, tutorial browser flow, and editor/playtest regression.
