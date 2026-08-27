@@ -19,4 +19,9 @@ npm test
 npm run build
 ```
 
+## GitHub Pages
+
+Pushes to `main` build and deploy `dist/` through [`.github/workflows/deploy-pages.yml`](.github/workflows/deploy-pages.yml).
+In the repository settings, set Pages > Build and deployment > Source to **GitHub Actions**. GitHub then publishes the site at the repository's Pages URL.
+
 The current gameplay, player experience, map, technology, and validation references are in the [MVP documentation set](doc/mvp/README.md). The [progress record](agents/progress/2026-08-26-game-demo-plan-grill.md) retains the decision and implementation history.
