@@ -8,10 +8,10 @@
   <body>
     <header class="editor-header">
       <div class="title-block">
-        <a class="back-link" href="./">← Back to game</a>
+        <a id="playtest-link" class="back-link" href="./?playtest=1">← Playtest current map</a>
         <p class="eyebrow">SUPPLY WAR</p>
         <h1>Map editor</h1>
-        <p>Edit every version-1 map field, preview the layout, then download the JSON.</p>
+        <p>Edit every version-1 map field, preview the layout, then save or playtest the draft.</p>
       </div>
       <div class="toolbar" aria-label="Map file actions">
         <label class="button file-button" for="map-file">Load JSON</label>
@@ -25,9 +25,9 @@
         <div class="section-title">
           <div>
             <h2 id="preview-title">Preview</h2>
-            <p>Drag a node to edit its coordinates. Exact values remain available in the form.</p>
+            <p>Click an object to inspect it. Drag a node to move it; drag its square connector onto another node to add a road.</p>
           </div>
-          <span id="file-name" class="file-name">mvp.json</span>
+          <div class="preview-meta"><span><strong id="node-count">0</strong> nodes</span><span><strong id="road-count">0</strong> roads</span><span id="file-name" class="file-name">mvp.json</span></div>
         </div>
         <canvas id="map-preview" width="900" height="560" aria-label="Current map layout preview"></canvas>
         <p id="map-status" class="status" role="status" aria-live="polite"></p>
@@ -42,25 +42,15 @@
           </div>
           <div id="settings-fields" class="field-grid"></div>
         </section>
-        <section class="form-section" aria-labelledby="nodes-title">
+        <section class="form-section" aria-labelledby="inspector-title">
           <div class="section-title">
             <div>
-              <h2 id="nodes-title">Nodes <span id="node-count" class="count"></span></h2>
-              <p>Changing a node ID also updates its road and transport references.</p>
+              <h2 id="inspector-title">Inspector</h2>
+              <p>Select one node or road in the preview to edit its properties.</p>
             </div>
             <button id="add-node" type="button">Add node</button>
           </div>
-          <div id="node-fields" class="card-list"></div>
-        </section>
-        <section class="form-section" aria-labelledby="roads-title">
-          <div class="section-title">
-            <div>
-              <h2 id="roads-title">Roads <span id="road-count" class="count"></span></h2>
-              <p>Each road connects two different nodes.</p>
-            </div>
-            <button id="add-road" type="button">Add road</button>
-          </div>
-          <div id="road-fields" class="card-list"></div>
+          <div id="selection-fields"></div>
         </section>
         <section class="form-section" aria-labelledby="transports-title">
           <div class="section-title">

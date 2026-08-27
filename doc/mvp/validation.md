@@ -31,7 +31,7 @@ Source: [`agents/tmp/2026-08-26-game-demo-plan-grill/script/balance_model.py`](.
 
 Headless Chromium completed the full hinted route and reported victory after the distant-rear layout. Separate browser checks verified held-drag feedback and cancellation of a player route. Evidence scripts and screenshots are retained under [`agents/tmp/2026-08-26-game-demo-plan-grill/`](../../agents/tmp/2026-08-26-game-demo-plan-grill/). Source: recorded Chromium validation.
 
-Headless Chromium also opened the editor from the game page, exercised every schema section, added and removed each collection type, updated coordinates by dragging, observed invalid-edit save blocking, preserved the current draft after a malformed import, loaded a valid map, and verified edited values in downloaded JSON. The full-page visual was inspected for layout/readability. Evidence is retained under [`agents/tmp/2026-08-27-browser-map-editor/`](../../agents/tmp/2026-08-27-browser-map-editor/). Source: local browser validation, 2026-08-27.
+Headless Chromium also opened the editor from the game page; verified the selection-only node/road inspector; created and selected a road by connector dragging; moved a node; added/removed nodes, roads, and transports; observed invalid-edit save/playtest blocking; preserved the draft after malformed import and canceled reset; confirmed reset; loaded a valid map; verified downloaded JSON; and completed an editor → playtest → editor draft/filename round trip. Full-page editor and playtest visuals were inspected. Evidence is retained under [`agents/tmp/2026-08-27-browser-map-editor/`](../../agents/tmp/2026-08-27-browser-map-editor/). Source: local browser validation, 2026-08-27.
 
 ## Remaining risk
 

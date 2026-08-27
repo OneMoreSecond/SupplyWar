@@ -10,8 +10,9 @@ Source: user-confirmed implementation choices and repository implementation summ
 | View and input | Canvas rendering, visual feedback, drag/right-click commands, independent render cadence | [`src/main.ts`](../../src/main.ts) |
 | Simulation | Deterministic ownership, production, transports, packets, capture, siege, and victory | [`src/game.ts`](../../src/game.ts) |
 | Map data | Versioned nodes, roads, settings, and initial enemy transports | [`maps/mvp.json`](../../maps/mvp.json) |
-| Editor shell | File actions, preview, complete version-1 map form, and editor module entry | [`editor.html`](../../editor.html) |
-| Editor behavior | Draft editing, validation feedback, preview drawing/dragging, JSON load, and JSON download | [`src/editor.ts`](../../src/editor.ts) |
+| Editor shell | File actions, selectable preview, object inspector, complete version-1 map form, and editor module entry | [`editor.html`](../../editor.html) |
+| Editor behavior | Draft editing, object selection, node/road gestures, validation feedback, JSON load/download, reset confirmation, and playtest transfer | [`src/editor.ts`](../../src/editor.ts) |
+| Playtest transfer | Browser-local keys shared by the editor and game entries | [`src/playtest.ts`](../../src/playtest.ts) |
 | Tests | Simulation mechanics, scenarios, and external map validation | [`test/game.test.ts`](../../test/game.test.ts) |
 
 ## Runtime model
@@ -30,7 +31,9 @@ This shared boundary lets the browser editor change map content without coupling
 
 Vite builds `index.html` and `editor.html` as separate browser entries. The game links to the editor with a relative URL so both pages work under the GitHub Pages project path. Source: [`vite.config.ts`](../../vite.config.ts), [`index.html`](../../index.html), [`editor.html`](../../editor.html).
 
-The editor starts from the authored MVP map and exposes `version`, every settings value, every node/road/initial-transport field, and collection add/remove controls. A preview draws partial drafts safely and supports coordinate dragging. Import validates parsed JSON before replacing the current draft; download remains disabled until the current draft validates. Source: [`src/editor.ts`](../../src/editor.ts), user requirements in [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md).
+The editor starts from the authored MVP map and exposes `version`, every settings value, every node/road/initial-transport field, and collection add/remove controls. Global settings and initial transports remain visible; node and road properties appear only for the currently selected preview object. Node-body dragging changes coordinates, while dragging a node's square connector onto another node creates and selects a road. Source: [`src/editor.ts`](../../src/editor.ts), user requirements in [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md).
+
+Import validates parsed JSON before replacing the current draft; download and playtest remain unavailable until the draft validates. Playtest serializes the valid draft and filename to `sessionStorage`, opens the game with `?playtest=1`, and returns through `editor.html?playtest=1`, where the same draft is restored. The authored `maps/mvp.json` is unchanged. Reset uses a confirmation dialog before replacing unsaved state. Source: [`src/editor.ts`](../../src/editor.ts), [`src/main.ts`](../../src/main.ts), [`src/playtest.ts`](../../src/playtest.ts), and user review comments in [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md).
 
 ## Narrow extension point
 

@@ -1,12 +1,47 @@
 import "./style.css";
 import mapConfig from "../maps/mvp.json";
-import { Simulation, type MapConfig, type NodeState, type Owner, type Transport } from "./game";
+import { Simulation, validateMap, type MapConfig, type NodeState, type Owner, type Transport } from "./game";
+import { playtestMapKey } from "./playtest";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
 const context = canvas.getContext("2d")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const restart = document.querySelector<HTMLButtonElement>("#restart")!;
-const config = mapConfig as MapConfig;
+const editorLink = document.querySelector<HTMLAnchorElement>("#editor-link")!;
+
+function pageConfig(): { config: MapConfig; playtest: boolean; fallback: boolean } {
+  if (!new URLSearchParams(window.location.search).has("playtest")) return { config: mapConfig as MapConfig, playtest: false, fallback: false };
+  const stored = sessionStorage.getItem(playtestMapKey);
+  if (!stored) {
+    console.warn("Could not load the playtest draft because browser session storage is empty; using the authored MVP map.");
+    return { config: mapConfig as MapConfig, playtest: false, fallback: true };
+  }
+  try {
+    const parsed: unknown = JSON.parse(stored);
+    validateMap(parsed);
+    return { config: parsed, playtest: true, fallback: false };
+  } catch (error) {
+    console.warn("Could not load the playtest draft because its stored map is invalid; using the authored MVP map.", error);
+    return { config: mapConfig as MapConfig, playtest: false, fallback: true };
+  }
+}
+
+const page = pageConfig();
+const config = page.config;
+if (page.playtest) {
+  document.querySelector<HTMLElement>("#mode-label")!.textContent = "SUPPLY WAR · MAP PLAYTEST";
+  document.querySelector<HTMLElement>("#mission-title")!.textContent = "Playtest your current map.";
+  document.querySelector<HTMLElement>("#briefing")!.textContent = "This simulation uses the valid draft stored by the map editor.";
+  document.querySelector<HTMLElement>("#hint")!.textContent = "Restart restores the draft. Return to the editor to keep refining it.";
+  editorLink.textContent = "Back to editor";
+  editorLink.href = "./editor.html?playtest=1";
+} else if (page.fallback) {
+  document.querySelector<HTMLElement>("#mode-label")!.textContent = "SUPPLY WAR · PLAYTEST FALLBACK";
+  document.querySelector<HTMLElement>("#mission-title")!.textContent = "Playtest draft unavailable.";
+  document.querySelector<HTMLElement>("#briefing")!.textContent = "The stored editor draft could not be loaded, so the authored MVP map is running instead.";
+  document.querySelector<HTMLElement>("#hint")!.textContent = "Return to the editor and start the playtest again.";
+  editorLink.textContent = "Open editor";
+}
 let game = new Simulation(config);
 let dragSource: string | null = null;
 let dragPoint: { x: number; y: number } | null = null;

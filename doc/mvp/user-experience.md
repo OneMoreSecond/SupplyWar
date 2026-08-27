@@ -43,13 +43,17 @@ Source: user visual-feedback decisions and browser verification; implementation:
 | Action | Input | Result |
 | --- | --- | --- |
 | Load a map | Select `Load JSON`, then a `.json` file | A valid version-1 map replaces the draft; an invalid file leaves it unchanged and explains the correction needed |
-| Edit values | Use the settings and collection cards | Updates the draft and preview immediately; node ID changes preserve its road/transport references |
-| Edit layout | Drag a node in the preview or enter exact `X` / `Y` values | Updates the node coordinates |
-| Change collections | Select `Add` or `Remove` in a node, road, or transport section | Adds a usable default item or removes the chosen draft item |
+| Select an object | Select a node or road in the preview | Shows only that object's editable fields in the inspector |
+| Edit values | Use global settings, the selected-object inspector, and initial-transport cards | Updates the draft and preview immediately; node ID changes preserve its road/transport references |
+| Move a node | Drag the node body or enter exact `X` / `Y` values | Updates the node coordinates |
+| Create a road | Drag a node's square connector onto another node | Adds and selects a width-1 road; selecting an existing connection chooses that road instead of duplicating it |
+| Change collections | Select `Add node`, connector-drag a road, `Add transport`, or the selected/card `Remove` action | Adds or removes the chosen draft item |
 | Save a map | Select `Save JSON` when the map is valid | Downloads formatted JSON under the current map filename |
-| Return to play | Select `Back to game` | Returns to the game page |
+| Playtest | Select `Playtest current map` when the draft is valid | Runs the current editor draft in the game without changing the authored map |
+| Return from playtest | Select `Back to editor` | Restores the same draft and filename for continued editing |
+| Reset | Select `Reset to MVP`, then confirm | Replaces the draft with the authored MVP map; canceling preserves the current draft |
 
-The validation status states whether saving is available and gives a specific correction when the draft is invalid. A failed file load also states that the current map was not changed. Source: error-state requirements from the error-message skill; implementation and browser evidence in [`src/editor.ts`](../../src/editor.ts) and [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md).
+The validation status states whether saving and playtesting are available and gives a specific correction when the draft is invalid. Failed file loads and canceled resets state that the current map was not changed. Source: error-state requirements from the error-message skill; implementation and browser evidence in [`src/editor.ts`](../../src/editor.ts) and [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md).
 
 ## Intended first play
 
