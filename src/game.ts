@@ -116,12 +116,66 @@ export class Simulation {
   }
 }
 
-export function validateMap(config: MapConfig): void {
-  if (config.version !== 1 || !siegeFormulas[config.settings.siegeFormula] || config.settings.logicTickSeconds <= 0 || config.settings.siegeHalfLifeSeconds <= 0 || config.settings.secondsPerDistanceUnit <= 0 || config.settings.forcePerWidthUnit <= 0) throw new Error("Invalid map settings");
-  const ids = new Set(config.nodes.map((node) => node.id));
-  if (ids.size !== config.nodes.length) throw new Error("Duplicate node id");
-  for (const road of config.roads) if (!ids.has(road.a) || !ids.has(road.b) || road.a === road.b || road.width <= 0) throw new Error(`Invalid road: ${road.id}`);
-  const keys = new Set<string>();
-  for (const road of config.roads) { const key = roadKey(road.a, road.b); if (keys.has(key)) throw new Error("Duplicate road"); keys.add(key); }
-  for (const transport of config.initialTransports) if (!ids.has(transport.source) || !ids.has(transport.target) || !keys.has(roadKey(transport.source, transport.target))) throw new Error("Invalid initial transport");
+const owners: Owner[] = ["player", "enemy", "neutral"];
+const nodeKinds: NodeKind[] = ["base", "resource", "ordinary"];
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
+
+export function validateMap(value: unknown): asserts value is MapConfig {
+  if (!isRecord(value)) throw new Error("The map root must be a JSON object");
+  if (value.version !== 1) throw new Error("Version must be 1");
+  if (!isRecord(value.settings)) throw new Error("Settings must be a JSON object");
+
+  const settings = value.settings;
+  if (typeof settings.siegeFormula !== "string" || !siegeFormulas[settings.siegeFormula]) throw new Error("Siege formula must be exponential-half-life");
+  for (const key of ["logicTickSeconds", "siegeHalfLifeSeconds", "secondsPerDistanceUnit", "forcePerWidthUnit"] as const) {
+    if (!isFiniteNumber(settings[key]) || settings[key] <= 0) throw new Error(`${key} must be a number greater than 0`);
+  }
+
+  if (!Array.isArray(value.nodes) || value.nodes.length === 0) throw new Error("Add at least one node");
+  const ids = new Set<string>();
+  const nodeOwners = new Map<string, Owner>();
+  for (const [index, candidate] of value.nodes.entries()) {
+    if (!isRecord(candidate)) throw new Error(`Node ${index + 1} must be a JSON object`);
+    if (typeof candidate.id !== "string" || candidate.id.trim() === "") throw new Error(`Node ${index + 1} needs an ID`);
+    if (ids.has(candidate.id)) throw new Error(`Node ID "${candidate.id}" is duplicated`);
+    if (typeof candidate.label !== "string" || candidate.label.trim() === "") throw new Error(`Node "${candidate.id}" needs a label`);
+    if (!owners.includes(candidate.owner as Owner)) throw new Error(`Node "${candidate.id}" has an invalid owner`);
+    if (!nodeKinds.includes(candidate.kind as NodeKind)) throw new Error(`Node "${candidate.id}" has an invalid kind`);
+    if (!isFiniteNumber(candidate.force) || candidate.force < 0) throw new Error(`Node "${candidate.id}" force must be 0 or greater`);
+    if (!isFiniteNumber(candidate.production) || candidate.production < 0) throw new Error(`Node "${candidate.id}" production must be 0 or greater`);
+    if (!isFiniteNumber(candidate.x) || !isFiniteNumber(candidate.y)) throw new Error(`Node "${candidate.id}" coordinates must be numbers`);
+    ids.add(candidate.id);
+    nodeOwners.set(candidate.id, candidate.owner as Owner);
+  }
+  if (!ids.has("player-base") || !ids.has("enemy-base")) throw new Error("Maps need player-base and enemy-base nodes for victory checks");
+
+  if (!Array.isArray(value.roads)) throw new Error("Roads must be a JSON array");
+  const roadIds = new Set<string>();
+  const roadKeys = new Set<string>();
+  for (const [index, candidate] of value.roads.entries()) {
+    if (!isRecord(candidate)) throw new Error(`Road ${index + 1} must be a JSON object`);
+    if (typeof candidate.id !== "string" || candidate.id.trim() === "") throw new Error(`Road ${index + 1} needs an ID`);
+    if (roadIds.has(candidate.id)) throw new Error(`Road ID "${candidate.id}" is duplicated`);
+    if (typeof candidate.a !== "string" || typeof candidate.b !== "string" || !ids.has(candidate.a) || !ids.has(candidate.b)) throw new Error(`Road "${candidate.id}" must connect existing nodes`);
+    if (candidate.a === candidate.b) throw new Error(`Road "${candidate.id}" must connect two different nodes`);
+    if (!isFiniteNumber(candidate.width) || candidate.width <= 0) throw new Error(`Road "${candidate.id}" width must be greater than 0`);
+    const key = roadKey(candidate.a, candidate.b);
+    if (roadKeys.has(key)) throw new Error(`A road between "${candidate.a}" and "${candidate.b}" already exists`);
+    roadIds.add(candidate.id);
+    roadKeys.add(key);
+  }
+
+  if (!Array.isArray(value.initialTransports)) throw new Error("Initial transports must be a JSON array");
+  const occupiedRoads = new Set<string>();
+  for (const [index, candidate] of value.initialTransports.entries()) {
+    if (!isRecord(candidate)) throw new Error(`Initial transport ${index + 1} must be a JSON object`);
+    if (typeof candidate.source !== "string" || typeof candidate.target !== "string" || !ids.has(candidate.source) || !ids.has(candidate.target)) throw new Error(`Initial transport ${index + 1} must use existing nodes`);
+    const key = roadKey(candidate.source, candidate.target);
+    if (!roadKeys.has(key)) throw new Error(`Initial transport ${index + 1} needs a road between its source and target`);
+    if (!owners.includes(candidate.owner as Owner) || candidate.owner === "neutral") throw new Error(`Initial transport ${index + 1} owner must be player or enemy`);
+    if (nodeOwners.get(candidate.source) !== candidate.owner) throw new Error(`Initial transport ${index + 1} owner must match its source node`);
+    if (occupiedRoads.has(key)) throw new Error(`Only one initial transport can use the road between "${candidate.source}" and "${candidate.target}"`);
+    occupiedRoads.add(key);
+  }
 }

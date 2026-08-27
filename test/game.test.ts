@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import mapConfig from "../maps/mvp.json";
-import { Simulation, type MapConfig } from "../src/game";
+import { Simulation, validateMap, type MapConfig } from "../src/game";
 
 const config = mapConfig as MapConfig;
 const runFor = (game: Simulation, seconds: number) => { for (let i = 0; i < Math.round(seconds / config.settings.logicTickSeconds); i++) game.step(); };
@@ -80,5 +80,32 @@ describe("Supply War simulation", () => {
     expect(game.startTransport("player-base", "frontline", "player")).not.toBeNull();
     runFor(game, 240);
     expect(game.node("frontline").owner).toBe("enemy");
+  });
+});
+
+describe("Map validation", () => {
+  it("accepts the authored map", () => {
+    expect(() => validateMap(structuredClone(config))).not.toThrow();
+  });
+
+  it("reports malformed external map data without property-access errors", () => {
+    expect(() => validateMap(null)).toThrow("The map root must be a JSON object");
+    expect(() => validateMap({ version: 1 })).toThrow("Settings must be a JSON object");
+  });
+
+  it("validates every node field", () => {
+    const invalid = structuredClone(config) as unknown as { nodes: Array<Record<string, unknown>> };
+    invalid.nodes[0]!.production = -1;
+    expect(() => validateMap(invalid)).toThrow('Node "player-base" production must be 0 or greater');
+  });
+
+  it("rejects duplicate road IDs and unusable initial transports", () => {
+    const duplicateRoad = structuredClone(config);
+    duplicateRoad.roads[1]!.id = duplicateRoad.roads[0]!.id;
+    expect(() => validateMap(duplicateRoad)).toThrow('Road ID "player-frontline" is duplicated');
+
+    const wrongOwner = structuredClone(config);
+    wrongOwner.initialTransports[0]!.owner = "player";
+    expect(() => validateMap(wrongOwner)).toThrow("owner must match its source node");
   });
 });
