@@ -1,6 +1,7 @@
 import "./editor.css";
 import defaultMap from "../maps/mvp.json";
-import { validateMap, type MapConfig, type MapNode, type NodeKind, type Owner, type Road } from "./game";
+import { Camera2D, type Point2D } from "./camera";
+import { validateMap, type MapConfig, type MapNode, type MapTransport, type NodeKind, type Owner, type Road } from "./game";
 import { playtestFileNameKey, playtestMapKey } from "./playtest";
 
 type Selection = { kind: "node"; node: MapNode } | { kind: "road"; road: Road } | null;
@@ -14,10 +15,11 @@ const saveButton = document.querySelector<HTMLButtonElement>("#save-map")!;
 const playtestLink = document.querySelector<HTMLAnchorElement>("#playtest-link")!;
 const settingsFields = document.querySelector<HTMLElement>("#settings-fields")!;
 const selectionFields = document.querySelector<HTMLElement>("#selection-fields")!;
-const transportFields = document.querySelector<HTMLElement>("#transport-fields")!;
 const nodeCount = document.querySelector<HTMLElement>("#node-count")!;
 const roadCount = document.querySelector<HTMLElement>("#road-count")!;
-const transportCount = document.querySelector<HTMLElement>("#transport-count")!;
+const zoomLevel = document.querySelector<HTMLElement>("#zoom-level")!;
+const fitMapButton = document.querySelector<HTMLButtonElement>("#fit-map")!;
+const camera = new Camera2D(preview.width, preview.height);
 
 const ownerOptions: Owner[] = ["player", "enemy", "neutral"];
 const kindOptions: NodeKind[] = ["base", "resource", "ordinary"];
@@ -48,7 +50,9 @@ let downloadName = initial.fileName;
 let selection: Selection = null;
 let movingNode: MapNode | null = null;
 let roadSource: MapNode | null = null;
-let roadDragPoint: { x: number; y: number } | null = null;
+let roadDragPoint: Point2D | null = null;
+let pan: { pointerId: number; last: Point2D } | null = null;
+camera.fit(draft.nodes);
 
 function field(labelText: string, control: HTMLElement, help?: string): HTMLLabelElement {
   const label = document.createElement("label");
@@ -147,6 +151,64 @@ function renderSettings(): void {
   );
 }
 
+function transportForRoad(road: Road): MapTransport | undefined {
+  const key = endpointKey(road.a, road.b);
+  return draft.initialTransports.find((transport) => endpointKey(transport.source, transport.target) === key);
+}
+
+function updateRoadEndpoint(road: Road, endpoint: "a" | "b", value: string): void {
+  const previous = road[endpoint];
+  const transport = transportForRoad(road);
+  road[endpoint] = value;
+  if (!transport) return;
+  if (transport.source === previous) transport.source = value;
+  if (transport.target === previous) transport.target = value;
+}
+
+function defaultTransport(road: Road): MapTransport {
+  const aOwner = draft.nodes.find((node) => node.id === road.a)?.owner;
+  const bOwner = draft.nodes.find((node) => node.id === road.b)?.owner;
+  if (aOwner === "player" || aOwner === "enemy") return { source: road.a, target: road.b, owner: aOwner };
+  if (bOwner === "player" || bOwner === "enemy") return { source: road.b, target: road.a, owner: bOwner };
+  return { source: road.a, target: road.b, owner: "player" };
+}
+
+function transportEditor(road: Road): HTMLElement {
+  const root = document.createElement("section");
+  root.className = "transport-editor";
+  const heading = document.createElement("div");
+  heading.className = "card-heading";
+  const title = document.createElement("h4");
+  title.textContent = "Initial transport";
+  const transport = transportForRoad(road);
+  const action = document.createElement("button");
+  action.type = "button";
+  action.textContent = transport ? "Remove transport" : "Add transport";
+  action.className = transport ? "danger" : "";
+  action.addEventListener("click", () => {
+    if (transport) draft.initialTransports.splice(draft.initialTransports.indexOf(transport), 1);
+    else draft.initialTransports.push(defaultTransport(road));
+    renderAll(transport ? "Removed the road's initial transport." : "Added an initial transport to the selected road.");
+  });
+  heading.append(title, action);
+  root.append(heading);
+  if (!transport) {
+    root.append(emptyState("This road has no initial transport."));
+    return root;
+  }
+
+  const fields = document.createElement("div");
+  fields.className = "field-grid";
+  const endpoints = [road.a, road.b];
+  fields.append(
+    field("Source", selectInput(transport.source, endpoints, (value) => { transport.source = value; })),
+    field("Target", selectInput(transport.target, endpoints, (value) => { transport.target = value; })),
+    field("Owner", selectInput(transport.owner, ownerOptions, (value) => { transport.owner = value; })),
+  );
+  root.append(fields);
+  return root;
+}
+
 function renderInspector(): void {
   selectionFields.replaceChildren();
   if (!selection) {
@@ -191,6 +253,8 @@ function renderInspector(): void {
 
   const road = selection.road;
   const item = card(`Road: ${road.id || "Untitled"}`, () => {
+    const transport = transportForRoad(road);
+    if (transport) draft.initialTransports.splice(draft.initialTransports.indexOf(transport), 1);
     draft.roads.splice(draft.roads.indexOf(road), 1);
     selection = null;
     renderAll();
@@ -198,31 +262,11 @@ function renderInspector(): void {
   item.fields.append(
     field("ID", textInput(road.id, (value) => { road.id = value; })),
     field("Width", numberInput(road.width, (value) => { road.width = value; }, Number.MIN_VALUE)),
-    field("Endpoint A", selectInput(road.a, nodeReferences(road.a), (value) => { road.a = value; })),
-    field("Endpoint B", selectInput(road.b, nodeReferences(road.b), (value) => { road.b = value; })),
+    field("Endpoint A", selectInput(road.a, nodeReferences(road.a), (value) => { updateRoadEndpoint(road, "a", value); })),
+    field("Endpoint B", selectInput(road.b, nodeReferences(road.b), (value) => { updateRoadEndpoint(road, "b", value); })),
   );
+  item.root.append(transportEditor(road));
   selectionFields.append(item.root);
-}
-
-function renderTransports(): void {
-  transportCount.textContent = String(draft.initialTransports.length);
-  transportFields.replaceChildren();
-  if (draft.initialTransports.length === 0) {
-    transportFields.append(emptyState("No initial transports. The map will start without active routes."));
-    return;
-  }
-  for (const [index, transport] of draft.initialTransports.entries()) {
-    const item = card(`Initial transport ${index + 1}`, () => {
-      draft.initialTransports.splice(index, 1);
-      renderAll();
-    });
-    item.fields.append(
-      field("Source", selectInput(transport.source, nodeReferences(transport.source), (value) => { transport.source = value; })),
-      field("Target", selectInput(transport.target, nodeReferences(transport.target), (value) => { transport.target = value; })),
-      field("Owner", selectInput(transport.owner, ownerOptions, (value) => { transport.owner = value; })),
-    );
-    transportFields.append(item.root);
-  }
 }
 
 function endpointKey(a: string, b: string): string {
@@ -235,42 +279,62 @@ function roadBetween(a: string, b: string): Road | undefined {
 }
 
 function connectorPoint(node: MapNode): { x: number; y: number } {
+  const screen = camera.worldToScreen(node);
   return {
-    x: node.x > preview.width - 40 ? node.x - 25 : node.x + 25,
-    y: node.y < 40 ? node.y + 25 : node.y - 25,
+    x: screen.x > preview.width - 40 ? screen.x - 25 : screen.x + 25,
+    y: screen.y < 40 ? screen.y + 25 : screen.y - 25,
   };
+}
+
+function drawGrid(): void {
+  const topLeft = camera.screenToWorld({ x: 0, y: 0 });
+  const bottomRight = camera.screenToWorld({ x: preview.width, y: preview.height });
+  let spacing = 100;
+  while (spacing * camera.zoom < 45) spacing *= 2;
+  while (spacing * camera.zoom > 130) spacing /= 2;
+  const startX = Math.floor(topLeft.x / spacing) * spacing;
+  const startY = Math.floor(topLeft.y / spacing) * spacing;
+  context.strokeStyle = "#223241";
+  context.lineWidth = 1;
+  for (let x = startX; x <= bottomRight.x; x += spacing) {
+    const screenX = camera.worldToScreen({ x, y: 0 }).x;
+    context.beginPath();
+    context.moveTo(screenX, 0);
+    context.lineTo(screenX, preview.height);
+    context.stroke();
+  }
+  for (let y = startY; y <= bottomRight.y; y += spacing) {
+    const screenY = camera.worldToScreen({ x: 0, y }).y;
+    context.beginPath();
+    context.moveTo(0, screenY);
+    context.lineTo(preview.width, screenY);
+    context.stroke();
+  }
 }
 
 function drawPreview(): void {
   context.clearRect(0, 0, preview.width, preview.height);
   context.fillStyle = "#17212b";
   context.fillRect(0, 0, preview.width, preview.height);
-  context.strokeStyle = "#223241";
-  context.lineWidth = 1;
-  for (let x = 50; x < preview.width; x += 50) {
-    context.beginPath();
-    context.moveTo(x, 0);
-    context.lineTo(x, preview.height);
-    context.stroke();
-  }
-  for (let y = 50; y < preview.height; y += 50) {
-    context.beginPath();
-    context.moveTo(0, y);
-    context.lineTo(preview.width, y);
-    context.stroke();
-  }
+  drawGrid();
+  zoomLevel.textContent = `${Math.round(camera.zoom * 100)}%`;
+  preview.dataset.cameraX = camera.centerX.toFixed(2);
+  preview.dataset.cameraY = camera.centerY.toFixed(2);
+  preview.dataset.cameraZoom = camera.zoom.toFixed(4);
 
   const nodeById = new Map(draft.nodes.map((node) => [node.id, node]));
   for (const road of draft.roads) {
     const a = nodeById.get(road.a);
     const b = nodeById.get(road.b);
     if (!a || !b || !Number.isFinite(a.x) || !Number.isFinite(a.y) || !Number.isFinite(b.x) || !Number.isFinite(b.y)) continue;
+    const screenA = camera.worldToScreen(a);
+    const screenB = camera.worldToScreen(b);
     const selected = selection?.kind === "road" && selection.road === road;
     context.strokeStyle = selected ? "#f0bd4f" : "#61778b";
     context.lineWidth = (Number.isFinite(road.width) ? Math.max(2, Math.min(12, road.width * 4)) : 2) + (selected ? 3 : 0);
     context.beginPath();
-    context.moveTo(a.x, a.y);
-    context.lineTo(b.x, b.y);
+    context.moveTo(screenA.x, screenA.y);
+    context.lineTo(screenB.x, screenB.y);
     context.stroke();
   }
 
@@ -282,7 +346,8 @@ function drawPreview(): void {
     context.strokeStyle = canAdd ? "#42c97a" : "#b9c5d0";
     context.lineWidth = 4;
     context.beginPath();
-    context.moveTo(roadSource.x, roadSource.y);
+    const source = camera.worldToScreen(roadSource);
+    context.moveTo(source.x, source.y);
     context.lineTo(roadDragPoint.x, roadDragPoint.y);
     context.stroke();
     context.restore();
@@ -290,16 +355,17 @@ function drawPreview(): void {
 
   for (const node of draft.nodes) {
     if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) continue;
+    const screen = camera.worldToScreen(node);
     if (selection?.kind === "node" && selection.node === node) {
       context.strokeStyle = "#f0bd4f";
       context.lineWidth = 3;
       context.beginPath();
-      context.arc(node.x, node.y, 30, 0, Math.PI * 2);
+      context.arc(screen.x, screen.y, 30, 0, Math.PI * 2);
       context.stroke();
     }
     context.fillStyle = ownerColors[node.owner] ?? "#8d9aa7";
     context.beginPath();
-    context.arc(node.x, node.y, node === movingNode ? 25 : 23, 0, Math.PI * 2);
+    context.arc(screen.x, screen.y, node === movingNode ? 25 : 23, 0, Math.PI * 2);
     context.fill();
     context.strokeStyle = node.kind === "base" ? "#ffffff" : node.kind === "resource" ? "#f0bd4f" : "#17212b";
     context.lineWidth = node.kind === "ordinary" ? 2 : 4;
@@ -307,7 +373,7 @@ function drawPreview(): void {
     context.fillStyle = "#e6edf3";
     context.font = "600 13px system-ui";
     context.textAlign = "center";
-    context.fillText(node.label || node.id || "Untitled", node.x, node.y + 42);
+    context.fillText(node.label || node.id || "Untitled", screen.x, screen.y + 42);
 
     const connector = connectorPoint(node);
     context.fillStyle = node === roadSource ? "#42c97a" : "#dbe7ef";
@@ -349,7 +415,6 @@ function refresh(): void {
 function renderAll(successMessage?: string): void {
   renderSettings();
   renderInspector();
-  renderTransports();
   nodeCount.textContent = String(draft.nodes.length);
   roadCount.textContent = String(draft.roads.length);
   fileName.textContent = downloadName;
@@ -366,26 +431,11 @@ function nextId(prefix: string, existing: string[]): string {
 }
 
 document.querySelector<HTMLButtonElement>("#add-node")!.addEventListener("click", () => {
-  const node: MapNode = { id: nextId("node", draft.nodes.map((candidate) => candidate.id)), label: "New Node", owner: "neutral", force: 0, production: 0, kind: "ordinary", x: 450, y: 280 };
+  const center = camera.screenToWorld({ x: preview.width / 2, y: preview.height / 2 });
+  const node: MapNode = { id: nextId("node", draft.nodes.map((candidate) => candidate.id)), label: "New Node", owner: "neutral", force: 0, production: 0, kind: "ordinary", x: Math.round(center.x), y: Math.round(center.y) };
   draft.nodes.push(node);
   selection = { kind: "node", node };
   renderAll("Added and selected a new node. Drag it in the preview to place it.");
-});
-
-document.querySelector<HTMLButtonElement>("#add-transport")!.addEventListener("click", () => {
-  const occupied = new Set(draft.initialTransports.map((transport) => endpointKey(transport.source, transport.target)));
-  const road = draft.roads.find((candidate) => !occupied.has(endpointKey(candidate.a, candidate.b))) ?? draft.roads[0];
-  let source = road?.a ?? draft.nodes[0]?.id ?? "";
-  let target = road?.b ?? draft.nodes[1]?.id ?? source;
-  let sourceOwner = draft.nodes.find((node) => node.id === source)?.owner;
-  const targetOwner = draft.nodes.find((node) => node.id === target)?.owner;
-  if (sourceOwner === "neutral" && targetOwner !== "neutral") {
-    [source, target] = [target, source];
-    sourceOwner = targetOwner;
-  }
-  const owner: Owner = sourceOwner === "player" || sourceOwner === "enemy" ? sourceOwner : "player";
-  draft.initialTransports.push({ source, target, owner });
-  renderAll();
 });
 
 document.querySelector<HTMLButtonElement>("#reset-map")!.addEventListener("click", () => {
@@ -397,6 +447,7 @@ document.querySelector<HTMLButtonElement>("#reset-map")!.addEventListener("click
   draft = structuredClone(defaultMap) as MapConfig;
   downloadName = "mvp.json";
   selection = null;
+  camera.fit(draft.nodes);
   renderAll("Reset to the built-in MVP map. The map is valid and ready to save or playtest.");
 });
 
@@ -409,6 +460,7 @@ fileInput.addEventListener("change", async () => {
     draft = structuredClone(parsed);
     downloadName = file.name.toLowerCase().endsWith(".json") ? file.name : `${file.name}.json`;
     selection = null;
+    camera.fit(draft.nodes);
     renderAll(`Loaded ${file.name}. The map is valid and ready to edit, save, or playtest.`);
   } catch (error) {
     const reason = error instanceof SyntaxError
@@ -445,7 +497,7 @@ playtestLink.addEventListener("click", (event) => {
   window.location.href = playtestLink.href;
 });
 
-function previewPoint(event: PointerEvent): { x: number; y: number } {
+function previewPoint(event: MouseEvent): Point2D {
   const bounds = preview.getBoundingClientRect();
   return {
     x: (event.clientX - bounds.left) * preview.width / bounds.width,
@@ -454,7 +506,11 @@ function previewPoint(event: PointerEvent): { x: number; y: number } {
 }
 
 function nodeAt(point: { x: number; y: number }): MapNode | undefined {
-  return [...draft.nodes].reverse().find((node) => Number.isFinite(node.x) && Number.isFinite(node.y) && Math.hypot(node.x - point.x, node.y - point.y) <= 27);
+  return [...draft.nodes].reverse().find((node) => {
+    if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return false;
+    const screen = camera.worldToScreen(node);
+    return Math.hypot(screen.x - point.x, screen.y - point.y) <= 27;
+  });
 }
 
 function connectorAt(point: { x: number; y: number }): MapNode | undefined {
@@ -465,7 +521,7 @@ function connectorAt(point: { x: number; y: number }): MapNode | undefined {
   });
 }
 
-function pointLineDistance(point: { x: number; y: number }, a: MapNode, b: MapNode): number {
+function pointLineDistance(point: Point2D, a: Point2D, b: Point2D): number {
   const dx = b.x - a.x;
   const dy = b.y - a.y;
   const lengthSquared = dx * dx + dy * dy;
@@ -478,7 +534,7 @@ function roadAt(point: { x: number; y: number }): Road | undefined {
   for (const road of [...draft.roads].reverse()) {
     const a = draft.nodes.find((node) => node.id === road.a);
     const b = draft.nodes.find((node) => node.id === road.b);
-    if (a && b && pointLineDistance(point, a, b) <= Math.max(8, road.width * 2 + 3)) return road;
+    if (a && b && pointLineDistance(point, camera.worldToScreen(a), camera.worldToScreen(b)) <= Math.max(8, road.width * 2 + 3)) return road;
   }
   return undefined;
 }
@@ -508,7 +564,16 @@ preview.addEventListener("pointerdown", (event) => {
   }
 
   const road = roadAt(point);
-  selection = road ? { kind: "road", road } : null;
+  if (road) {
+    selection = { kind: "road", road };
+    renderInspector();
+    drawPreview();
+    return;
+  }
+
+  selection = null;
+  pan = { pointerId: event.pointerId, last: point };
+  preview.setPointerCapture(event.pointerId);
   renderInspector();
   drawPreview();
 });
@@ -521,9 +586,17 @@ preview.addEventListener("pointermove", (event) => {
     return;
   }
   if (movingNode) {
-    movingNode.x = Math.round(Math.max(0, Math.min(preview.width, point.x)));
-    movingNode.y = Math.round(Math.max(0, Math.min(preview.height, point.y)));
+    const world = camera.screenToWorld(point);
+    movingNode.x = Math.round(world.x);
+    movingNode.y = Math.round(world.y);
     refresh();
+    return;
+  }
+  if (pan?.pointerId === event.pointerId) {
+    camera.panByPixels(point.x - pan.last.x, point.y - pan.last.y);
+    pan.last = point;
+    preview.style.cursor = "grabbing";
+    drawPreview();
     return;
   }
   preview.style.cursor = connectorAt(point) ? "crosshair" : nodeAt(point) ? "move" : roadAt(point) ? "pointer" : "default";
@@ -561,6 +634,14 @@ preview.addEventListener("pointerup", (event) => {
     movingNode = null;
     releasePointer(event);
     renderAll();
+    return;
+  }
+
+  if (pan?.pointerId === event.pointerId) {
+    pan = null;
+    releasePointer(event);
+    preview.style.cursor = "grab";
+    drawPreview();
   }
 });
 
@@ -568,8 +649,21 @@ preview.addEventListener("pointercancel", (event) => {
   roadSource = null;
   roadDragPoint = null;
   movingNode = null;
+  pan = null;
   releasePointer(event);
   renderAll();
+});
+
+preview.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  camera.zoomAt(previewPoint(event), Math.exp(-event.deltaY * 0.0015));
+  drawPreview();
+}, { passive: false });
+
+fitMapButton.addEventListener("click", () => {
+  camera.fit(draft.nodes);
+  drawPreview();
+  setStatus("Fit all nodes in the editor viewport. Map coordinates were not changed.", false);
 });
 
 renderAll(

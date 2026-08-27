@@ -9,9 +9,9 @@ Source: user-confirmed MVP decisions and implementation evidence in [the game pr
 | Area | Current reference | Covers |
 | --- | --- | --- |
 | Rules and objective | [Gameplay](gameplay.md) | Transport, capture, support, siege, victory, and deferred rules |
-| Player-facing flow | [User experience](user-experience.md) | Briefing, game controls, map-editor workflow, feedback, colors, and interaction states |
-| Authored scenario | [Map design](map-design.md) | Topology, node placement, values, initial enemy routes, and intended tactic |
-| Implementation | [Technology](tech.md) | Stack, engine boundaries, simulation order, data model, editor, and extension points |
+| Player-facing flow | [User experience](user-experience.md) | Briefing, game and camera controls, map-editor workflow, playtest speed, feedback, colors, and interaction states |
+| Authored scenario | [Map design](map-design.md) | Topology, node placement, values, initial enemy routes, crossing policy, and intended tactic |
+| Implementation | [Technology](tech.md) | Stack, engine boundaries, simulation order, camera, data model, editor, and extension points |
 | Evidence and operating checks | [Validation](validation.md) | Automated checks, balance scenarios, game/editor browser checks, and known risk |
 
 ## Scope boundary

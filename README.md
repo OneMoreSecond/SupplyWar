@@ -2,7 +2,7 @@
 
 Browser prototype for a supply-route strategy game. Capture the enemy resource to break its support transport, siege the frontline, then bypass the enemy backup to take the base.
 
-The game page links to a browser map editor. It can load and save version-1 map JSON, edit all settings and collection fields, inspect one selected node or road at a time, drag nodes to place them, drag node connectors to create roads, and playtest the current draft before downloading it. Source: [`editor.html`](editor.html), [`src/editor.ts`](src/editor.ts), [`src/main.ts`](src/main.ts).
+The game page links to a browser map editor. It can load and save version-1 map JSON, edit every setting and collection field, attach an optional initial transport to each road, drag nodes and road connectors, pan or zoom across unbounded map coordinates, and playtest the current draft at 1×–8× speed. Source: [`editor.html`](editor.html), [`src/editor.ts`](src/editor.ts), [`src/main.ts`](src/main.ts).
 
 Source: [MVP documentation set](doc/mvp/README.md).
 

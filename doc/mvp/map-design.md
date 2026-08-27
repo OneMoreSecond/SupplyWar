@@ -15,7 +15,7 @@ Player Base ── Enemy Frontline ───────── Enemy Base
        └─────────────────────╯
 ```
 
-The roads are Player Base–Frontline, Frontline–Resource, Resource–Backup, Backup–Enemy Base, Player Base–Resource, and Frontline–Enemy Base. The graph is planar. Source: [`maps/mvp.json`](../../maps/mvp.json).
+The roads are Player Base–Frontline, Frontline–Resource, Resource–Backup, Backup–Enemy Base, Player Base–Resource, and Frontline–Enemy Base. This authored layout avoids crossings for readability, but road crossings are valid game data and may be used by other maps. Source: [`maps/mvp.json`](../../maps/mvp.json) for the layout; user review, 2026-08-27, for the crossing policy.
 
 ## Nodes
 

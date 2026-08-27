@@ -25,9 +25,9 @@
         <div class="section-title">
           <div>
             <h2 id="preview-title">Preview</h2>
-            <p>Click an object to inspect it. Drag a node to move it; drag its square connector onto another node to add a road.</p>
+            <p>Click an object to inspect it. Drag nodes to move, connectors to add roads, and empty space to pan. Use the wheel to zoom.</p>
           </div>
-          <div class="preview-meta"><span><strong id="node-count">0</strong> nodes</span><span><strong id="road-count">0</strong> roads</span><span id="file-name" class="file-name">mvp.json</span></div>
+          <div class="preview-meta"><span><strong id="node-count">0</strong> nodes</span><span><strong id="road-count">0</strong> roads</span><span id="zoom-level">100%</span><button id="fit-map" class="compact" type="button">Fit map</button><span id="file-name" class="file-name">mvp.json</span></div>
         </div>
         <canvas id="map-preview" width="900" height="560" aria-label="Current map layout preview"></canvas>
         <p id="map-status" class="status" role="status" aria-live="polite"></p>
@@ -51,16 +51,6 @@
             <button id="add-node" type="button">Add node</button>
           </div>
           <div id="selection-fields"></div>
-        </section>
-        <section class="form-section" aria-labelledby="transports-title">
-          <div class="section-title">
-            <div>
-              <h2 id="transports-title">Initial transports <span id="transport-count" class="count"></span></h2>
-              <p>A transport needs an existing road and must match its source owner.</p>
-            </div>
-            <button id="add-transport" type="button">Add transport</button>
-          </div>
-          <div id="transport-fields" class="card-list"></div>
         </section>
       </form>
     </main>

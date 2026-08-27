@@ -1,5 +1,6 @@
 import "./style.css";
 import mapConfig from "../maps/mvp.json";
+import { Camera2D, type Point2D } from "./camera";
 import { Simulation, validateMap, type MapConfig, type NodeState, type Owner, type Transport } from "./game";
 import { playtestMapKey } from "./playtest";
 
@@ -8,6 +9,9 @@ const context = canvas.getContext("2d")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const restart = document.querySelector<HTMLButtonElement>("#restart")!;
 const editorLink = document.querySelector<HTMLAnchorElement>("#editor-link")!;
+const speedControl = document.querySelector<HTMLElement>("#speed-control")!;
+const speedInput = document.querySelector<HTMLInputElement>("#playtest-speed")!;
+const speedValue = document.querySelector<HTMLOutputElement>("#speed-value")!;
 
 function pageConfig(): { config: MapConfig; playtest: boolean; fallback: boolean } {
   if (!new URLSearchParams(window.location.search).has("playtest")) return { config: mapConfig as MapConfig, playtest: false, fallback: false };
@@ -32,9 +36,10 @@ if (page.playtest) {
   document.querySelector<HTMLElement>("#mode-label")!.textContent = "SUPPLY WAR · MAP PLAYTEST";
   document.querySelector<HTMLElement>("#mission-title")!.textContent = "Playtest your current map.";
   document.querySelector<HTMLElement>("#briefing")!.textContent = "This simulation uses the valid draft stored by the map editor.";
-  document.querySelector<HTMLElement>("#hint")!.textContent = "Restart restores the draft. Return to the editor to keep refining it.";
+  document.querySelector<HTMLElement>("#hint")!.textContent = "Use the speed bar to accelerate simulation. Drag empty map space to pan and use the wheel to zoom.";
   editorLink.textContent = "Back to editor";
   editorLink.href = "./editor.html?playtest=1";
+  speedControl.hidden = false;
 } else if (page.fallback) {
   document.querySelector<HTMLElement>("#mode-label")!.textContent = "SUPPLY WAR · PLAYTEST FALLBACK";
   document.querySelector<HTMLElement>("#mission-title")!.textContent = "Playtest draft unavailable.";
@@ -42,23 +47,46 @@ if (page.playtest) {
   document.querySelector<HTMLElement>("#hint")!.textContent = "Return to the editor and start the playtest again.";
   editorLink.textContent = "Open editor";
 }
+
 let game = new Simulation(config);
+const camera = new Camera2D(canvas.width, canvas.height);
+camera.fit(config.nodes);
 let dragSource: string | null = null;
-let dragPoint: { x: number; y: number } | null = null;
+let dragPoint: Point2D | null = null;
+let pan: { pointerId: number; last: Point2D } | null = null;
 let lastFrame = performance.now();
 let accumulator = 0;
+let speedMultiplier = 1;
 const colors: Record<Owner, string> = { player: "#42c97a", enemy: "#ed5d62", neutral: "#8d9aa7" };
 
-function nodeAt(x: number, y: number): NodeState | undefined { return [...game.nodes.values()].find((node) => Math.hypot(node.x - x, node.y - y) < 34); }
-function toCanvas(event: PointerEvent | MouseEvent): { x: number; y: number } { const rect = canvas.getBoundingClientRect(); return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height }; }
-function pointLineDistance(x: number, y: number, a: NodeState, b: NodeState): number { const dx = b.x - a.x; const dy = b.y - a.y; const t = Math.max(0, Math.min(1, ((x - a.x) * dx + (y - a.y) * dy) / (dx * dx + dy * dy))); return Math.hypot(x - (a.x + dx * t), y - (a.y + dy * t)); }
+function toCanvas(event: MouseEvent): Point2D {
+  const rect = canvas.getBoundingClientRect();
+  return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height };
+}
+
+function nodeAt(point: Point2D): NodeState | undefined {
+  return [...game.nodes.values()].find((node) => {
+    const screen = camera.worldToScreen(node);
+    return Math.hypot(screen.x - point.x, screen.y - point.y) < 34;
+  });
+}
+
+function pointLineDistance(point: Point2D, a: Point2D, b: Point2D): number {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const lengthSquared = dx * dx + dy * dy;
+  if (lengthSquared === 0) return Math.hypot(point.x - a.x, point.y - a.y);
+  const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared));
+  return Math.hypot(point.x - (a.x + dx * t), point.y - (a.y + dy * t));
+}
+
 function canStartPlayerTransport(source: string, target: NodeState | undefined): boolean {
   if (!target || target.id === source) return false;
   const road = game.roadBetween(source, target.id);
   return road !== undefined && !game.activeOnRoad(road.id);
 }
 
-function drawDirectionTriangle(a: { x: number; y: number }, b: { x: number; y: number }, t: number, color: string): void {
+function drawDirectionTriangle(a: Point2D, b: Point2D, t: number, color: string): void {
   const x = a.x + (b.x - a.x) * t;
   const y = a.y + (b.y - a.y) * t;
   context.save();
@@ -75,19 +103,21 @@ function drawDirectionTriangle(a: { x: number; y: number }, b: { x: number; y: n
 }
 
 function drawRoad(transport: Transport | undefined, a: NodeState, b: NodeState): void {
+  const screenA = camera.worldToScreen(a);
+  const screenB = camera.worldToScreen(b);
   context.lineWidth = transport ? 9 : 5;
   context.strokeStyle = transport ? colors[transport.owner] : "#536475";
   context.globalAlpha = transport ? 0.82 : 0.8;
-  context.beginPath(); context.moveTo(a.x, a.y); context.lineTo(b.x, b.y); context.stroke(); context.globalAlpha = 1;
+  context.beginPath(); context.moveTo(screenA.x, screenA.y); context.lineTo(screenB.x, screenB.y); context.stroke(); context.globalAlpha = 1;
   if (!transport) return;
-  const phase = (game.time % 1) / 1;
-  for (let i = 0; i < 3; i++) drawDirectionTriangle(a, b, 0.14 + ((phase + i / 3) % 1) * 0.72, "#f7fbff");
+  const phase = game.time % 1;
+  for (let i = 0; i < 3; i++) drawDirectionTriangle(screenA, screenB, 0.14 + ((phase + i / 3) % 1) * 0.72, "#f7fbff");
 }
 
 function drawDragPreview(): void {
   if (!dragSource || !dragPoint) return;
-  const source = game.node(dragSource);
-  const target = nodeAt(dragPoint.x, dragPoint.y);
+  const source = camera.worldToScreen(game.node(dragSource));
+  const target = nodeAt(dragPoint);
   const valid = canStartPlayerTransport(dragSource, target);
   const color = valid ? colors.player : "#b9c5d0";
   context.save();
@@ -101,30 +131,71 @@ function drawDragPreview(): void {
   context.stroke();
   context.restore();
   drawDirectionTriangle(source, dragPoint, 0.82, color);
-  if (valid && target) { context.strokeStyle = color; context.lineWidth = 4; context.beginPath(); context.arc(target.x, target.y, 38, 0, Math.PI * 2); context.stroke(); }
+  if (valid && target) {
+    const targetScreen = camera.worldToScreen(target);
+    context.strokeStyle = color;
+    context.lineWidth = 4;
+    context.beginPath();
+    context.arc(targetScreen.x, targetScreen.y, 38, 0, Math.PI * 2);
+    context.stroke();
+  }
 }
 
-function isBesieged(node: NodeState): boolean { const targeting = game.transports.filter((transport) => transport.active && transport.target === node.id); return targeting.some((transport) => game.mode(transport) === "attack") && !targeting.some((transport) => game.mode(transport) === "support"); }
+function isBesieged(node: NodeState): boolean {
+  const targeting = game.transports.filter((transport) => transport.active && transport.target === node.id);
+  return targeting.some((transport) => game.mode(transport) === "attack") && !targeting.some((transport) => game.mode(transport) === "support");
+}
+
 function drawNode(node: NodeState): void {
-  if (isBesieged(node)) { context.strokeStyle = "#f0bd4f"; context.lineWidth = 5; context.beginPath(); context.arc(node.x, node.y, 40 + Math.sin(game.time * 5) * 2, 0, Math.PI * 2); context.stroke(); }
-  context.fillStyle = colors[node.owner]; context.beginPath(); context.arc(node.x, node.y, 31, 0, Math.PI * 2); context.fill();
-  context.strokeStyle = node.kind === "base" ? "#fff" : node.kind === "resource" ? "#f0bd4f" : "#1a2530"; context.lineWidth = node.kind === "ordinary" ? 2 : 5; context.stroke();
-  context.fillStyle = "#10151c"; context.font = "700 18px system-ui"; context.textAlign = "center"; context.fillText(String(Math.round(node.force)), node.x, node.y + 6);
-  context.fillStyle = "#dbe7ef"; context.font = "600 12px system-ui"; context.fillText(node.label, node.x, node.y + 53);
-  if (node.kind !== "ordinary") { context.fillStyle = "#f0bd4f"; context.font = "700 11px system-ui"; context.fillText(node.kind.toUpperCase(), node.x, node.y - 43); }
+  const screen = camera.worldToScreen(node);
+  if (isBesieged(node)) {
+    context.strokeStyle = "#ff334d";
+    context.lineWidth = 5;
+    context.beginPath();
+    context.arc(screen.x, screen.y, 40 + Math.sin(game.time * 5) * 2, 0, Math.PI * 2);
+    context.stroke();
+  }
+  context.fillStyle = colors[node.owner];
+  context.beginPath();
+  context.arc(screen.x, screen.y, 31, 0, Math.PI * 2);
+  context.fill();
+  context.strokeStyle = node.kind === "base" ? "#fff" : node.kind === "resource" ? "#f0bd4f" : "#1a2530";
+  context.lineWidth = node.kind === "ordinary" ? 2 : 5;
+  context.stroke();
+  context.fillStyle = "#10151c";
+  context.font = "700 18px system-ui";
+  context.textAlign = "center";
+  context.fillText(String(Math.round(node.force)), screen.x, screen.y + 6);
+  context.fillStyle = "#dbe7ef";
+  context.font = "600 12px system-ui";
+  context.fillText(node.label, screen.x, screen.y + 53);
+  if (node.kind !== "ordinary") {
+    context.fillStyle = "#f0bd4f";
+    context.font = "700 11px system-ui";
+    context.fillText(node.kind.toUpperCase(), screen.x, screen.y - 43);
+  }
 }
 
 function render(): void {
   context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "#17212b"; context.fillRect(0, 0, canvas.width, canvas.height);
+  context.fillStyle = "#17212b";
+  context.fillRect(0, 0, canvas.width, canvas.height);
   for (const road of game.roads.values()) {
     const active = game.activeOnRoad(road.id);
     drawRoad(active, active ? game.node(active.source) : game.node(road.a), active ? game.node(active.target) : game.node(road.b));
   }
   drawDragPreview();
   for (const node of game.nodes.values()) drawNode(node);
-  context.fillStyle = "#b9c5d0"; context.font = "13px system-ui"; context.textAlign = "left"; context.fillText(`Simulation ${game.time.toFixed(1)}s · 10 Hz`, 18, 28);
-  const target = dragPoint ? nodeAt(dragPoint.x, dragPoint.y) : undefined;
+  context.fillStyle = "#b9c5d0";
+  context.font = "13px system-ui";
+  context.textAlign = "left";
+  const tickRate = 1 / config.settings.logicTickSeconds;
+  context.fillText(`Simulation ${game.time.toFixed(1)}s · ${tickRate.toFixed(0)} Hz${page.playtest ? ` · ${speedMultiplier}×` : ""}`, 18, 28);
+  canvas.dataset.simulationTime = game.time.toFixed(2);
+  canvas.dataset.cameraX = camera.centerX.toFixed(2);
+  canvas.dataset.cameraY = camera.centerY.toFixed(2);
+  canvas.dataset.cameraZoom = camera.zoom.toFixed(4);
+  const target = dragPoint ? nodeAt(dragPoint) : undefined;
   status.textContent = game.winner === "player"
     ? "Victory — the enemy base surrendered."
     : dragSource && canStartPlayerTransport(dragSource, target)
@@ -134,32 +205,91 @@ function render(): void {
         : "Capture the enemy base to win.";
 }
 
-function frame(now: number): void { accumulator += Math.min((now - lastFrame) / 1000, 0.25); lastFrame = now; while (accumulator >= config.settings.logicTickSeconds) { game.step(); accumulator -= config.settings.logicTickSeconds; } render(); requestAnimationFrame(frame); }
+function frame(now: number): void {
+  accumulator += Math.min((now - lastFrame) / 1000, 0.25) * speedMultiplier;
+  lastFrame = now;
+  while (accumulator >= config.settings.logicTickSeconds) {
+    game.step();
+    accumulator -= config.settings.logicTickSeconds;
+  }
+  render();
+  requestAnimationFrame(frame);
+}
+
+speedInput.addEventListener("input", () => {
+  speedMultiplier = speedInput.valueAsNumber;
+  speedValue.value = `${speedMultiplier}×`;
+});
 
 canvas.addEventListener("pointerdown", (event) => {
   if (event.button !== 0) return;
   const point = toCanvas(event);
-  const node = nodeAt(point.x, point.y);
-  dragSource = node?.owner === "player" ? node.id : null;
-  dragPoint = dragSource ? point : null;
-  if (dragSource) canvas.setPointerCapture(event.pointerId);
+  const node = nodeAt(point);
+  if (node?.owner === "player") {
+    dragSource = node.id;
+    dragPoint = point;
+  } else {
+    pan = { pointerId: event.pointerId, last: point };
+  }
+  canvas.setPointerCapture(event.pointerId);
 });
-canvas.addEventListener("pointermove", (event) => { if (dragSource) dragPoint = toCanvas(event); });
-canvas.addEventListener("pointerup", (event) => {
-  if (!dragSource) return;
-  const source = dragSource;
+
+canvas.addEventListener("pointermove", (event) => {
   const point = toCanvas(event);
-  const target = nodeAt(point.x, point.y);
-  if (canStartPlayerTransport(source, target) && target) game.startTransport(source, target.id, "player");
-  dragSource = null;
-  dragPoint = null;
-  canvas.releasePointerCapture(event.pointerId);
+  if (dragSource) {
+    dragPoint = point;
+    return;
+  }
+  if (pan?.pointerId === event.pointerId) {
+    camera.panByPixels(point.x - pan.last.x, point.y - pan.last.y);
+    pan.last = point;
+    canvas.style.cursor = "grabbing";
+  }
 });
+
+canvas.addEventListener("pointerup", (event) => {
+  if (dragSource) {
+    const source = dragSource;
+    const target = nodeAt(toCanvas(event));
+    if (canStartPlayerTransport(source, target) && target) game.startTransport(source, target.id, "player");
+    dragSource = null;
+    dragPoint = null;
+  }
+  if (pan?.pointerId === event.pointerId) {
+    pan = null;
+    canvas.style.cursor = "grab";
+  }
+  if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
+});
+
 canvas.addEventListener("pointercancel", (event) => {
   dragSource = null;
   dragPoint = null;
+  pan = null;
   if (canvas.hasPointerCapture(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
 });
-canvas.addEventListener("contextmenu", (event) => { event.preventDefault(); const point = toCanvas(event); for (const transport of game.transports.filter((candidate) => candidate.active && candidate.owner === "player")) { const a = game.node(transport.source); const b = game.node(transport.target); if (pointLineDistance(point.x, point.y, a, b) < 16) { game.cancelTransport(transport.id); break; } } });
-restart.addEventListener("click", () => { game = new Simulation(config); });
+
+canvas.addEventListener("contextmenu", (event) => {
+  event.preventDefault();
+  const point = toCanvas(event);
+  for (const transport of game.transports.filter((candidate) => candidate.active && candidate.owner === "player")) {
+    const a = camera.worldToScreen(game.node(transport.source));
+    const b = camera.worldToScreen(game.node(transport.target));
+    if (pointLineDistance(point, a, b) < 16) {
+      game.cancelTransport(transport.id);
+      break;
+    }
+  }
+});
+
+canvas.addEventListener("wheel", (event) => {
+  event.preventDefault();
+  camera.zoomAt(toCanvas(event), Math.exp(-event.deltaY * 0.0015));
+}, { passive: false });
+
+restart.addEventListener("click", () => {
+  game = new Simulation(config);
+  accumulator = 0;
+});
+
 requestAnimationFrame(frame);

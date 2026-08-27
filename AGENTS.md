@@ -6,9 +6,10 @@ The key fun point is defeating a stronger but badly positioned enemy force with 
 
 ## Project constraints
 
-- The map is a planar graph of nodes and roads.
 - Keep map data separate from the core engine to support future modding and a map editor.
 - Keep simulation and visual rendering on separate ticks.
+
+Road crossings are allowed by the game and editor. Avoiding crossings is a map-design preference, not a project requirement. Source: user review, 2026-08-27.
 
 ## Current MVP
 

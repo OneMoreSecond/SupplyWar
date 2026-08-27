@@ -19,6 +19,8 @@ Source: user-requested mission briefing; implementation: [`index.html`](../../in
 | Start a transport | Drag from a green player-owned node to an adjacent node | Starts a player transport if its road is unused |
 | Preview a transport | Hold the drag | Shows an arrowed dashed path and explains whether release will send force |
 | Cancel a transport | Right-click a green active road | Cancels that player transport and removes force on it |
+| Pan the map | Drag non-interactive map space | Moves the viewport without changing map coordinates |
+| Zoom the map | Use the wheel over the canvas | Zooms around the pointer while keeping node markers readable |
 | Restart | Select `Restart map` | Reloads the authored map state |
 | Open the editor | Select `Map editor` | Opens the browser map editor in the same site |
 
@@ -34,7 +36,7 @@ Source: user-confirmed input decisions; implementation: [`src/main.ts`](../../sr
 | Active transport | Owner-colored road with animated white triangles from transport source to target | Read occupancy and actual flow direction |
 | Valid drag target | Green dashed arrow and target ring | Confirm a release will start a transport |
 | Invalid drag | Grey dashed arrow and explicit guidance | Explain why no transport will start yet |
-| Unsupported siege | Pulsing gold ring | Make a supply cut's consequence visible |
+| Unsupported siege | Pulsing bright-red ring | Distinguish active attrition from the gold resource-node marker |
 
 Source: user visual-feedback decisions and browser verification; implementation: [`src/main.ts`](../../src/main.ts), [`src/style.css`](../../src/style.css).
 
@@ -44,12 +46,15 @@ Source: user visual-feedback decisions and browser verification; implementation:
 | --- | --- | --- |
 | Load a map | Select `Load JSON`, then a `.json` file | A valid version-1 map replaces the draft; an invalid file leaves it unchanged and explains the correction needed |
 | Select an object | Select a node or road in the preview | Shows only that object's editable fields in the inspector |
-| Edit values | Use global settings, the selected-object inspector, and initial-transport cards | Updates the draft and preview immediately; node ID changes preserve its road/transport references |
+| Edit values | Use global settings and the selected-object inspector | Updates the draft and preview immediately; node ID changes preserve its road/transport references |
 | Move a node | Drag the node body or enter exact `X` / `Y` values | Updates the node coordinates |
 | Create a road | Drag a node's square connector onto another node | Adds and selects a width-1 road; selecting an existing connection chooses that road instead of duplicating it |
-| Change collections | Select `Add node`, connector-drag a road, `Add transport`, or the selected/card `Remove` action | Adds or removes the chosen draft item |
+| Edit an initial transport | Select a road, then use its `Initial transport` subsection | Adds, edits, or removes that road's optional one transport |
+| Navigate a large map | Drag empty preview space, use the wheel, or select `Fit map` | Pans or zooms the unbounded coordinate space without altering authored coordinates |
+| Change collections | Select `Add node`, connector-drag a road, or a selected object's `Remove` action | Adds or removes the chosen draft item; removing a road also removes its initial transport |
 | Save a map | Select `Save JSON` when the map is valid | Downloads formatted JSON under the current map filename |
 | Playtest | Select `Playtest current map` when the draft is valid | Runs the current editor draft in the game without changing the authored map |
+| Accelerate playtest | Move the playtest-only `Speed` bar from 1× up to 8× | Advances more fixed simulation steps per real second without changing the authored logic tick |
 | Return from playtest | Select `Back to editor` | Restores the same draft and filename for continued editing |
 | Reset | Select `Reset to MVP`, then confirm | Replaces the draft with the authored MVP map; canceling preserves the current draft |
 

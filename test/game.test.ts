@@ -88,6 +88,16 @@ describe("Map validation", () => {
     expect(() => validateMap(structuredClone(config))).not.toThrow();
   });
 
+  it("allows roads to cross", () => {
+    const crossing = structuredClone(config);
+    Object.assign(crossing.nodes.find((node) => node.id === "player-base")!, { x: 0, y: 0 });
+    Object.assign(crossing.nodes.find((node) => node.id === "frontline")!, { x: 100, y: 0 });
+    Object.assign(crossing.nodes.find((node) => node.id === "resource")!, { x: 50, y: -50 });
+    Object.assign(crossing.nodes.find((node) => node.id === "backup")!, { x: 50, y: 50 });
+
+    expect(() => validateMap(crossing)).not.toThrow();
+  });
+
   it("reports malformed external map data without property-access errors", () => {
     expect(() => validateMap(null)).toThrow("The map root must be a JSON object");
     expect(() => validateMap({ version: 1 })).toThrow("Settings must be a JSON object");
