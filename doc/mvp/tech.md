@@ -1,20 +1,21 @@
 # MVP Technology
 
-Source: user-confirmed implementation choices and repository implementation summarized in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), Sections 4–6, and [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md), on 2026-08-27.
+Source: user-confirmed implementation choices and repository implementation summarized in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), Sections 4–6, [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md), and [the tutorial progress record](../../agents/progress/2026-08-27-tutorial-level-progression.md), on 2026-08-27.
 
 ## Architecture
 
 | Component | Responsibility | Primary location |
 | --- | --- | --- |
-| Game shell | Header, map-editor entry, canvas, restart control, and game module entry | [`index.html`](../../index.html) |
-| View and input | Canvas rendering, visual feedback, drag/right-click commands, independent render cadence | [`src/main.ts`](../../src/main.ts) |
+| Game shell | Level picker, guidance, victory-only next action, map-editor entry, canvas, and restart control | [`index.html`](../../index.html) |
+| View and input | Level routing, Canvas rendering, visual feedback, drag/right-click commands, and independent render cadence | [`src/main.ts`](../../src/main.ts) |
+| Level catalog | Ordered tutorial/final-exam metadata and authored map configs | [`src/levels.ts`](../../src/levels.ts) |
 | Camera | Shared world/screen conversion, panning, pointer-anchored zoom, and fit-to-map | [`src/camera.ts`](../../src/camera.ts) |
 | Simulation | Deterministic ownership, production, transports, packets, capture, siege, and victory | [`src/game.ts`](../../src/game.ts) |
-| Map data | Versioned nodes, roads, settings, and initial enemy transports | [`maps/mvp.json`](../../maps/mvp.json) |
+| Map data | Versioned nodes, roads, settings, and initial transports for five authored levels | [`maps/`](../../maps/) |
 | Editor shell | File actions, selectable preview, object inspector, complete version-1 map form, and editor module entry | [`editor.html`](../../editor.html) |
 | Editor behavior | Draft editing, object selection, node/road gestures, validation feedback, JSON load/download, reset confirmation, and playtest transfer | [`src/editor.ts`](../../src/editor.ts) |
 | Playtest transfer | Browser-local keys shared by the editor and game entries | [`src/playtest.ts`](../../src/playtest.ts) |
-| Tests | Simulation mechanics, scenarios, external map validation, and camera transforms | [`test/game.test.ts`](../../test/game.test.ts), [`test/camera.test.ts`](../../test/camera.test.ts) |
+| Tests | Simulation mechanics, scenarios, external map validation, camera transforms, tutorial focus, and catalog navigation | [`test/game.test.ts`](../../test/game.test.ts), [`test/camera.test.ts`](../../test/camera.test.ts), [`test/levels.test.ts`](../../test/levels.test.ts) |
 
 ## Runtime model
 
@@ -27,6 +28,12 @@ For each simulation step, the engine produces force, delivers due packets, cance
 `MapConfig` defines versioned map data. One strict validator checks every version-1 scalar field, node IDs and required victory nodes, road IDs/endpoints/topology uniqueness, and usable initial transports at simulation startup and editor import/save time. Road crossings are allowed. The JSON map owns forces, production, unbounded world coordinates, road widths, initial flows, timing values, and the selected siege-formula identifier. Source: [`src/game.ts`](../../src/game.ts), [`maps/mvp.json`](../../maps/mvp.json), and user review, 2026-08-27.
 
 This shared boundary lets the browser editor change map content without coupling it to the simulation engine. Source: project constraint in [`AGENTS.md`](../../AGENTS.md); implementation in [`src/editor.ts`](../../src/editor.ts).
+
+## Authored level flow
+
+`src/levels.ts` is an ordered catalog of four tutorials followed by `maps/mvp.json`. It owns player-facing level names and guidance without extending `MapConfig`. Normal entry resolves `?level=<id>` and defaults unknown or missing IDs to Tutorial 1. The picker changes that query; player victory reveals `Next level` only when the catalog has a successor. The final exam has none. Source: user goal; implementation: [`src/levels.ts`](../../src/levels.ts), [`src/main.ts`](../../src/main.ts), and [`index.html`](../../index.html).
+
+Editor `?playtest=1` remains a separate, higher-priority route: it hides authored-level controls and runs the validated `sessionStorage` draft. Missing or invalid draft storage retains the existing MVP fallback. Source: existing playtest contract and [`src/main.ts`](../../src/main.ts).
 
 ## Browser map editor
 

@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "settings": {
+    "logicTickSeconds": 0.1,
+    "siegeFormula": "exponential-half-life",
+    "siegeHalfLifeSeconds": 10000,
+    "secondsPerDistanceUnit": 0.005,
+    "forcePerWidthUnit": 1
+  },
+  "nodes": [
+    { "id": "player-base", "label": "Your Base", "owner": "player", "force": 30, "production": 0.5, "kind": "base", "x": 180, "y": 280 },
+    { "id": "enemy-base", "label": "Small Enemy Base", "owner": "enemy", "force": 4, "production": 0, "kind": "base", "x": 720, "y": 280 }
+  ],
+  "roads": [
+    { "id": "direct-road", "a": "player-base", "b": "enemy-base", "width": 2 }
+  ],
+  "initialTransports": []
+}

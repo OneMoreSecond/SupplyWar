@@ -1,7 +1,7 @@
 import "./style.css";
-import mapConfig from "../maps/mvp.json";
 import { Camera2D, type Point2D } from "./camera";
 import { Simulation, validateMap, type MapConfig, type NodeState, type Owner, type Transport } from "./game";
+import { levelById, levels, nextLevel, type LevelDefinition } from "./levels";
 import { playtestMapKey } from "./playtest";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
@@ -9,30 +9,58 @@ const context = canvas.getContext("2d")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const restart = document.querySelector<HTMLButtonElement>("#restart")!;
 const editorLink = document.querySelector<HTMLAnchorElement>("#editor-link")!;
+const levelControl = document.querySelector<HTMLElement>("#level-control")!;
+const levelPicker = document.querySelector<HTMLSelectElement>("#level-picker")!;
+const nextLevelButton = document.querySelector<HTMLButtonElement>("#next-level")!;
 const speedControl = document.querySelector<HTMLElement>("#speed-control")!;
 const speedInput = document.querySelector<HTMLInputElement>("#playtest-speed")!;
 const speedValue = document.querySelector<HTMLOutputElement>("#speed-value")!;
 
-function pageConfig(): { config: MapConfig; playtest: boolean; fallback: boolean } {
-  if (!new URLSearchParams(window.location.search).has("playtest")) return { config: mapConfig as MapConfig, playtest: false, fallback: false };
+type Page = { config: MapConfig; mode: "level"; level: LevelDefinition } | { config: MapConfig; mode: "playtest" | "fallback"; level?: undefined };
+
+function pageConfig(): Page {
+  const params = new URLSearchParams(window.location.search);
+  if (!params.has("playtest")) {
+    const level = levelById(params.get("level"));
+    return { config: level.config, mode: "level", level };
+  }
   const stored = sessionStorage.getItem(playtestMapKey);
   if (!stored) {
     console.warn("Could not load the playtest draft because browser session storage is empty; using the authored MVP map.");
-    return { config: mapConfig as MapConfig, playtest: false, fallback: true };
+    return { config: levelById("mvp").config, mode: "fallback" };
   }
   try {
     const parsed: unknown = JSON.parse(stored);
     validateMap(parsed);
-    return { config: parsed, playtest: true, fallback: false };
+    return { config: parsed, mode: "playtest" };
   } catch (error) {
     console.warn("Could not load the playtest draft because its stored map is invalid; using the authored MVP map.", error);
-    return { config: mapConfig as MapConfig, playtest: false, fallback: true };
+    return { config: levelById("mvp").config, mode: "fallback" };
   }
 }
 
 const page = pageConfig();
 const config = page.config;
-if (page.playtest) {
+const successor = page.level ? nextLevel(page.level.id) : undefined;
+const tutorialLevels = levels.filter((level) => level.kind === "tutorial");
+
+if (page.mode === "level") {
+  for (const level of levels) {
+    const option = document.createElement("option");
+    option.value = level.id;
+    option.textContent = level.pickerLabel;
+    levelPicker.append(option);
+  }
+  levelPicker.value = page.level.id;
+  levelControl.hidden = false;
+  const tutorialNumber = tutorialLevels.findIndex((level) => level.id === page.level.id) + 1;
+  document.querySelector<HTMLElement>("#mode-label")!.textContent = page.level.kind === "tutorial"
+    ? `SUPPLY WAR · TUTORIAL ${tutorialNumber}/${tutorialLevels.length} · ${page.level.mechanism}`
+    : "SUPPLY WAR · FINAL EXAM";
+  document.querySelector<HTMLElement>("#mission-title")!.textContent = page.level.title;
+  document.querySelector<HTMLElement>("#briefing")!.textContent = page.level.briefing;
+  document.querySelector<HTMLElement>("#hint")!.textContent = page.level.hint;
+} else if (page.mode === "playtest") {
   document.querySelector<HTMLElement>("#mode-label")!.textContent = "SUPPLY WAR · MAP PLAYTEST";
   document.querySelector<HTMLElement>("#mission-title")!.textContent = "Playtest your current map.";
   document.querySelector<HTMLElement>("#briefing")!.textContent = "This simulation uses the valid draft stored by the map editor.";
@@ -40,13 +68,21 @@ if (page.playtest) {
   editorLink.textContent = "Back to editor";
   editorLink.href = "./editor.html?playtest=1";
   speedControl.hidden = false;
-} else if (page.fallback) {
+} else {
   document.querySelector<HTMLElement>("#mode-label")!.textContent = "SUPPLY WAR · PLAYTEST FALLBACK";
   document.querySelector<HTMLElement>("#mission-title")!.textContent = "Playtest draft unavailable.";
   document.querySelector<HTMLElement>("#briefing")!.textContent = "The stored editor draft could not be loaded, so the authored MVP map is running instead.";
   document.querySelector<HTMLElement>("#hint")!.textContent = "Return to the editor and start the playtest again.";
   editorLink.textContent = "Open editor";
 }
+
+levelPicker.addEventListener("change", () => {
+  window.location.search = `?level=${encodeURIComponent(levelPicker.value)}`;
+});
+
+nextLevelButton.addEventListener("click", () => {
+  if (successor) window.location.search = `?level=${encodeURIComponent(successor.id)}`;
+});
 
 let game = new Simulation(config);
 const camera = new Camera2D(canvas.width, canvas.height);
@@ -190,19 +226,27 @@ function render(): void {
   context.font = "13px system-ui";
   context.textAlign = "left";
   const tickRate = 1 / config.settings.logicTickSeconds;
-  context.fillText(`Simulation ${game.time.toFixed(1)}s · ${tickRate.toFixed(0)} Hz${page.playtest ? ` · ${speedMultiplier}×` : ""}`, 18, 28);
+  context.fillText(`Simulation ${game.time.toFixed(1)}s · ${tickRate.toFixed(0)} Hz${page.mode === "playtest" ? ` · ${speedMultiplier}×` : ""}`, 18, 28);
   canvas.dataset.simulationTime = game.time.toFixed(2);
+  canvas.dataset.levelId = page.level?.id ?? page.mode;
   canvas.dataset.cameraX = camera.centerX.toFixed(2);
   canvas.dataset.cameraY = camera.centerY.toFixed(2);
   canvas.dataset.cameraZoom = camera.zoom.toFixed(4);
   const target = dragPoint ? nodeAt(dragPoint) : undefined;
-  status.textContent = game.winner === "player"
-    ? "Victory — the enemy base surrendered."
-    : dragSource && canStartPlayerTransport(dragSource, target)
-      ? `Release to send forces to ${target!.label}.`
-      : dragSource
-        ? "Drag to an unused adjacent road, then release."
-        : "Capture the enemy base to win.";
+  nextLevelButton.hidden = game.winner !== "player" || !successor;
+  if (game.winner === "player" && successor && page.level) {
+    status.textContent = `Victory — ${page.level.pickerLabel} complete. Continue to ${successor.pickerLabel}.`;
+  } else if (game.winner === "player" && page.level?.kind === "final-exam") {
+    status.textContent = "Final exam complete — campaign cleared.";
+  } else if (game.winner === "player") {
+    status.textContent = "Victory — the enemy base surrendered.";
+  } else if (dragSource && canStartPlayerTransport(dragSource, target)) {
+    status.textContent = `Release to send forces to ${target!.label}.`;
+  } else if (dragSource) {
+    status.textContent = "Drag to an unused adjacent road, then release.";
+  } else {
+    status.textContent = "Capture the enemy base to win.";
+  }
 }
 
 function frame(now: number): void {

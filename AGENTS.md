@@ -13,8 +13,10 @@ Road crossings are allowed by the game and editor. Avoiding crossings is a map-d
 
 ## Current MVP
 
-Source: user-confirmed MVP review, 2026-08-26.
+Source: user-confirmed MVP review, 2026-08-26, and tutorial-progression goal, 2026-08-27.
+
+Normal play contains four focused tutorial maps followed by `maps/mvp.json` as the final exam. Source: user goal and `src/levels.ts`, 2026-08-27.
 
 The detailed MVP design, mechanics, map, balance values, acceptance criteria, and deferred scope are maintained in the [formal MVP documentation set](doc/mvp/README.md).
 
-Use those documents as the source of truth for implementation. Update the relevant category document when MVP decisions change; retain the [progress record](agents/progress/2026-08-26-game-demo-plan-grill.md) as the decision and implementation history.
+Use those documents as the source of truth for implementation. Update the relevant category document when MVP decisions change; retain the [game progress record](agents/progress/2026-08-26-game-demo-plan-grill.md) and [tutorial progress record](agents/progress/2026-08-27-tutorial-level-progression.md) as decision and implementation history.

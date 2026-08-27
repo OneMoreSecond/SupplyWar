@@ -1,13 +1,13 @@
 # MVP Validation
 
-Source: local validation evidence recorded in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), Sections 7.2–7.8 and 7.11, and [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md), summarized on 2026-08-27.
+Source: local validation evidence recorded in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), Sections 7.2–7.8 and 7.11, [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md), and [the tutorial progress record](../../agents/progress/2026-08-27-tutorial-level-progression.md), summarized on 2026-08-27.
 
 ## Automated checks
 
 | Command | Coverage | Recorded result |
 | --- | --- | --- |
 | `npm run typecheck` | TypeScript correctness | Passed |
-| `npm test` | Seven simulation cases, five external-map validation cases, and four shared-camera cases | Passed: 16 tests |
+| `npm test` | Simulation/map validation, shared camera, five-level catalog, and four scripted tutorial mechanisms | Passed: 22 tests |
 | `npm run build` | Production game and editor bundle | Passed |
 | `python3 agents/tmp/2026-08-26-game-demo-plan-grill/script/balance_model.py` | Geometry- and width-aware tactical/direct balance scenarios | Intended path succeeds; direct assault fails |
 
@@ -15,7 +15,7 @@ Source: recorded local validation and repository scripts.
 
 ## Test cases
 
-The Vitest suite covers road geometry/throughput derivation, configured siege-formula selection, source-change cancellation, target-change refresh to attack, siege surrender, the intended resource-cut win within 240 seconds, direct-frontline failure after 240 seconds, authored-map acceptance, permitted road crossings, malformed external roots, node-field validation, duplicate road IDs, unusable initial transports, world/screen round trips, anchored zoom, wide-map fitting, and panning. Source: [`test/game.test.ts`](../../test/game.test.ts) and [`test/camera.test.ts`](../../test/camera.test.ts).
+The Vitest suite covers road geometry/throughput derivation, configured siege-formula selection, source-change cancellation, target-change refresh to attack, siege surrender, the intended resource-cut win within 240 seconds, direct-frontline failure after 240 seconds, authored-map acceptance, permitted road crossings, malformed external roots, node-field validation, duplicate road IDs, unusable initial transports, world/screen round trips, anchored zoom, wide-map fitting, panning, catalog order/default/successor boundaries, all five map validations, and scripted wins proving each tutorial's focal mechanism. Source: [`test/game.test.ts`](../../test/game.test.ts), [`test/camera.test.ts`](../../test/camera.test.ts), and [`test/levels.test.ts`](../../test/levels.test.ts).
 
 ## Tactical balance evidence
 
@@ -31,8 +31,10 @@ Source: [`agents/tmp/2026-08-26-game-demo-plan-grill/script/balance_model.py`](.
 
 Headless Chromium completed the full hinted route and reported victory after the distant-rear layout. Separate browser checks verified held-drag feedback and cancellation of a player route. Evidence scripts and screenshots are retained under [`agents/tmp/2026-08-26-game-demo-plan-grill/`](../../agents/tmp/2026-08-26-game-demo-plan-grill/). Source: recorded Chromium validation.
 
-Headless Chromium also opened the editor from the game page; verified the selection-only inspector and road-scoped transport editor; created and selected a road by connector dragging; moved a node; observed invalid-edit save/playtest blocking; preserved the draft after malformed import and canceled reset; confirmed reset; verified downloaded JSON; and completed an editor → playtest → editor draft/filename round trip. A large map spanning `(-2000, -1500)` to `(8000, 5000)` fit at 6.46% zoom in both pages; editor pan and wheel zoom passed; and the final run advanced 3.2 simulation seconds at 8× versus 0.3 seconds at 1× over equal waits. Full-page editor and playtest visuals were inspected, including the separate red siege and gold resource rings. Evidence is retained under [`agents/tmp/2026-08-27-browser-map-editor/`](../../agents/tmp/2026-08-27-browser-map-editor/). Source: local browser validation, 2026-08-27.
+Headless Chromium also opened the editor from the game page; verified the selection-only inspector and road-scoped transport editor; created and selected a road by connector dragging; moved a node; observed invalid-edit save/playtest blocking; preserved the draft after malformed import and canceled reset; confirmed reset; verified downloaded JSON; and completed an editor → playtest → editor draft/filename round trip. A large map spanning `(-2000, -1500)` to `(8000, 5000)` fit at 6.46% zoom in both pages; editor pan and wheel zoom passed; and 8× consistently advanced more than four times as much simulation time as 1× over equal waits (latest: 3.2s versus 0.4s). Full-page editor and playtest visuals were inspected, including the separate red siege and gold resource rings. Evidence is retained under [`agents/tmp/2026-08-27-browser-map-editor/`](../../agents/tmp/2026-08-27-browser-map-editor/). Source: local browser validation, 2026-08-27.
+
+The tutorial production-browser check verified five ordered picker entries; Tutorial 1 default and mechanism guidance; hidden `Next level` before victory; a 4.9-second browser victory revealing the action; navigation to Tutorial 2; direct picker navigation through Tutorials 3–4 and the MVP final exam; safe unknown-level fallback; and isolation of editor playtest/fallback from authored-level controls. Tutorial-completion, active siege, and final-exam screenshots were inspected. Evidence is retained under [`agents/tmp/2026-08-27-tutorial-level-progression/`](../../agents/tmp/2026-08-27-tutorial-level-progression/). Source: local browser validation, 2026-08-27.
 
 ## Remaining risk
 
-The completed checks validate rules, both production pages, game/editor controls, the map file round trip, and the authored tactical path. Additional human feedback remains useful for qualitative editor clarity and game pacing, but is not an MVP acceptance blocker. Source: progress-record completion audits.
+The completed checks validate rules, all five authored maps, tutorial and final-exam navigation, both production pages, game/editor controls, the map-file round trip, and scripted intended paths. Additional human feedback remains useful for qualitative tutorial wording and pacing, but is not an MVP acceptance blocker. Campaign persistence and locking remain explicitly outside current scope. Source: progress-record completion audits.

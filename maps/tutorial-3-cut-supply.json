@@ -1,0 +1,22 @@
+{
+  "version": 1,
+  "settings": {
+    "logicTickSeconds": 0.1,
+    "siegeFormula": "exponential-half-life",
+    "siegeHalfLifeSeconds": 8,
+    "secondsPerDistanceUnit": 0.01,
+    "forcePerWidthUnit": 1
+  },
+  "nodes": [
+    { "id": "player-base", "label": "Your Base", "owner": "player", "force": 50, "production": 1, "kind": "base", "x": 150, "y": 280 },
+    { "id": "enemy-resource", "label": "Enemy Resource", "owner": "enemy", "force": 18, "production": 0.5, "kind": "resource", "x": 450, "y": 280 },
+    { "id": "enemy-base", "label": "Supported Base", "owner": "enemy", "force": 35, "production": 0, "kind": "base", "x": 750, "y": 280 }
+  ],
+  "roads": [
+    { "id": "resource-approach", "a": "player-base", "b": "enemy-resource", "width": 2 },
+    { "id": "enemy-supply", "a": "enemy-resource", "b": "enemy-base", "width": 1.5 }
+  ],
+  "initialTransports": [
+    { "source": "enemy-resource", "target": "enemy-base", "owner": "enemy" }
+  ]
+}

@@ -1,10 +1,10 @@
 # MVP Gameplay
 
-Source: user-confirmed MVP decisions in [the progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), Sections 4–5, summarized on 2026-08-26.
+Source: user-confirmed MVP decisions in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), Sections 4–5, and tutorial sequencing in [the tutorial progress record](../../agents/progress/2026-08-27-tutorial-level-progression.md), summarized on 2026-08-27.
 
 ## Goal
 
-Capture the enemy base. The MVP demonstrates that cutting support lets a weaker player defeat a stronger, badly positioned enemy. Source: user-confirmed MVP objective in the progress record.
+Capture the enemy base in each level. Tutorials introduce the rules separately; the MVP final exam demonstrates that cutting support lets a weaker player defeat a stronger, badly positioned enemy. Source: user tutorial goal and user-confirmed MVP objective in the progress records.
 
 ## Terms
 
@@ -49,4 +49,4 @@ At force `<= 0.01`, the node surrenders to the active attacker with a zero-force
 
 ## Enemy behavior and deferred scope
 
-The enemy begins with authored transports and starts no new transports during the game. Breakthrough, a reactive AI, capacity limits, a formal map editor, and external runtime formula plugins are outside this MVP. Source: user-confirmed MVP scope in the progress record.
+The enemy begins with authored transports and starts no new transports during the game. Breakthrough, a reactive AI, capacity limits, campaign persistence/locking, and external runtime formula plugins are outside this MVP. Source: user-confirmed MVP scope and tutorial-progression design in the progress records.
