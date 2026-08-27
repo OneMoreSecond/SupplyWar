@@ -23,3 +23,24 @@ agent: Codex
 time: 2026-08-27 10:48:59
 
 Completed the two review changes. Added Tutorial 3's triangular two-choice layout and narrow direct road; unit evidence proves the direct attack fails under support while the resource cut wins. Applied a uniform numeric 2x time scale across all tutorials and the MVP final exam, producing intended completion times of 2.4 / 7.2 / 10.7 / 7.3 / 71.8 seconds, each about half its preceding result. Updated level guidance, balance tooling, maintained docs, unit/browser coverage, screenshots, and the completion audit. Recorded passing typecheck, 23 tests, build, diff check, tutorial browser flow, and editor/playtest regression.
+
+---
+
+agent: Codex
+time: 2026-08-27 11:24:40
+
+Recorded and completed the latest user review. Tutorial 2 now uses an active enemy supply route to prevent siege decay and two player resource feeds to sustain the winning attack. Tutorial 3 places Enemy Resource beyond Supported Base. Tutorial 4 attacks a central fortress from Main Force plus north and south flanks. Added an authored-level congratulation dialog with replay and next-or-close actions, including final-exam completion. Retuned the reviewed routes to 7.2 / 11.0 / 7.1 seconds, updated maintained documentation and browser evidence, and recorded passing typecheck, 23 tests, production build, diff check, tutorial browser flow, editor/playtest regression, and visual inspection.
+
+---
+
+agent: Codex
+time: 2026-08-27 11:24:40
+
+Completed the final documentation audit by marking the fixed-guidance research statement as pre-task history rather than current behavior. No implementation or validation result changed.
+
+---
+
+agent: Codex
+time: 2026-08-27 11:25:16
+
+Correction: the preceding documentation-audit section reused the prior section's timestamp; this section records its actual completion time. Its content remains current.

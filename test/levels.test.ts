@@ -44,25 +44,36 @@ describe("authored level catalog", () => {
 
   it("teaches allied supply feeding an attack", () => {
     const level = levelById("support");
+    const protectedEnemy = new Simulation(level.config);
+    const initialEnemyForce = protectedEnemy.node("enemy-base").force;
+    expect(protectedEnemy.mode(protectedEnemy.transports[0]!)).toBe("support");
+    expect(protectedEnemy.startTransport("player-base", "enemy-base", "player")).not.toBeNull();
+    protectedEnemy.step(0.5);
+    expect(protectedEnemy.node("enemy-base").force).toBe(initialEnemyForce);
+
     const withoutSupply = new Simulation(level.config);
     expect(withoutSupply.startTransport("player-base", "enemy-base", "player")).not.toBeNull();
     runUntil(withoutSupply, () => withoutSupply.winner === "player", 15);
     expect(withoutSupply.winner).toBeNull();
 
     const game = new Simulation(level.config);
-    const support = game.startTransport("player-resource", "player-base", "player");
+    const upperSupport = game.startTransport("upper-resource", "player-base", "player");
+    const lowerSupport = game.startTransport("lower-resource", "player-base", "player");
     const attack = game.startTransport("player-base", "enemy-base", "player");
-    expect(support && game.mode(support)).toBe("support");
+    expect(upperSupport && game.mode(upperSupport)).toBe("support");
+    expect(lowerSupport && game.mode(lowerSupport)).toBe("support");
     expect(attack && game.mode(attack)).toBe("attack");
     runUntil(game, () => game.winner === "player", 45);
 
     expect(game.winner).toBe("player");
-    expect(game.time).toBeGreaterThan(6.8);
-    expect(game.time).toBeLessThan(7.7);
+    expect(game.time).toBeGreaterThan(7);
+    expect(game.time).toBeLessThan(7.4);
   });
 
   it("teaches that capturing a source cuts its enemy support", () => {
     const level = levelById("cut-supply");
+    expect(level.config.nodes.find((node) => node.id === "enemy-resource")!.x)
+      .toBeGreaterThan(level.config.nodes.find((node) => node.id === "enemy-base")!.x);
     const directAttack = new Simulation(level.config);
     expect(directAttack.startTransport("player-base", "enemy-base", "player")).not.toBeNull();
     runUntil(directAttack, () => directAttack.winner === "player", 30);
@@ -80,20 +91,27 @@ describe("authored level catalog", () => {
     expect(game.startTransport("enemy-resource", "enemy-base", "player")).not.toBeNull();
     runUntil(game, () => game.winner === "player", 90);
     expect(game.winner).toBe("player");
-    expect(game.time).toBeGreaterThan(10.2);
-    expect(game.time).toBeLessThan(11.5);
+    expect(game.time).toBeGreaterThan(10.8);
+    expect(game.time).toBeLessThan(11.2);
   });
 
   it("teaches siege by letting a weak force defeat a stronger unsupported base", () => {
     const level = levelById("siege");
     const game = new Simulation(level.config);
-    expect(game.node("player-base").force).toBeLessThan(game.node("enemy-base").force / 5);
+    const sideNodes = [game.node("north-flank"), game.node("south-flank")];
+    expect(sideNodes.every((node) => node.owner === "player")).toBe(true);
+    expect(sideNodes.every((node) => game.roadBetween(node.id, "enemy-base"))).toBe(true);
+    const playerForce = [game.node("player-base"), ...sideNodes]
+      .reduce((total, node) => total + node.force, 0);
+    expect(playerForce).toBeLessThan(game.node("enemy-base").force / 5);
     expect(game.startTransport("player-base", "enemy-base", "player")).not.toBeNull();
+    expect(game.startTransport("north-flank", "enemy-base", "player")).not.toBeNull();
+    expect(game.startTransport("south-flank", "enemy-base", "player")).not.toBeNull();
     runUntil(game, () => game.winner === "player", 60);
 
     expect(game.winner).toBe("player");
     expect(game.time).toBeGreaterThan(6.9);
-    expect(game.time).toBeLessThan(7.7);
+    expect(game.time).toBeLessThan(7.3);
   });
 
   it("halves the MVP final-exam completion time through map numbers", () => {

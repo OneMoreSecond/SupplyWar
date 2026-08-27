@@ -9,22 +9,22 @@ Each tutorial uses the unchanged version-1 schema and focuses on one new mechani
 | Map | Focal mechanism | Authored setup | Intended solution |
 | --- | --- | --- | --- |
 | [`tutorial-1-transport.json`](../../maps/tutorial-1-transport.json) | Transport and capture | One favorable direct road; siege half-life `5000s` keeps attrition negligible | Send Your Base directly to the Small Enemy Base |
-| [`tutorial-2-support.json`](../../maps/tutorial-2-support.json) | Allied support | A productive player resource sits behind a weak player base | Send resource → player base, then player base → enemy base |
-| [`tutorial-3-cut-supply.json`](../../maps/tutorial-3-cut-supply.json) | Source capture | A narrow direct base road fails against active support; the triangular resource route exposes its source | Reject the direct assault, capture Enemy Resource, then use the cleared supply road |
-| [`tutorial-4-siege.json`](../../maps/tutorial-4-siege.json) | Unsupported siege | Player force `12` faces unsupported enemy force `90` with a `1.25s` siege half-life | Start and hold the only attack route until the fortress surrenders |
+| [`tutorial-2-support.json`](../../maps/tutorial-2-support.json) | Allied support | Enemy Supply actively protects Supported Base from siege; Upper Supply and Lower Supply can both reinforce the weak player base | Start both player support routes, then attack Supported Base |
+| [`tutorial-3-cut-supply.json`](../../maps/tutorial-3-cut-supply.json) | Source capture | Enemy Resource sits beyond Supported Base; the narrow direct road fails while its support remains active | Go past the base to capture Enemy Resource, then attack back along its former supply road |
+| [`tutorial-4-siege.json`](../../maps/tutorial-4-siege.json) | Unsupported siege | Three player positions totaling force `12` surround an unsupported force-`90` fortress with a `1.4s` siege half-life | Attack from Main Force, North Flank, and South Flank to form the siege |
 
 Source: authored tutorial JSON and scripted solutions in [`test/levels.test.ts`](../../test/levels.test.ts).
 
 ## Time scale
 
-All five levels target half their preceding expected completion time through map numbers only. Relative balance is preserved by halving `siegeHalfLifeSeconds` and `secondsPerDistanceUnit`, while doubling `forcePerWidthUnit` and every non-zero node `production`. Tutorial 3 uses `0.0044` seconds per distance unit to compensate for moving its resource off the direct base line. The fixed `0.1s` logic tick and engine rules are unchanged. Source: user review, 2026-08-27; authored JSON and `src/game.ts`.
+All five levels target approximately half their preceding expected completion time through map numbers only. The original adjustment halved `siegeHalfLifeSeconds` and `secondsPerDistanceUnit` while doubling `forcePerWidthUnit` and every non-zero node `production`; the reviewed Tutorials 2–4 then received localized balance changes for their new layouts. Tutorial 3 uses `0.003` seconds per distance unit so placing its resource beyond the base retains short pacing. The fixed `0.1s` logic tick and engine rules are unchanged. Source: user reviews, 2026-08-27; authored JSON and [`src/game.ts`](../../src/game.ts).
 
 | Level | Before | After | Ratio |
 | --- | ---: | ---: | ---: |
 | Tutorial 1 — Transport | 4.8s | 2.4s | 50.0% |
 | Tutorial 2 — Support | 14.3s | 7.2s | 50.3% |
-| Tutorial 3 — Cut supply | 21.2s | 10.7s | 50.5% |
-| Tutorial 4 — Siege | 14.5s | 7.3s | 50.3% |
+| Tutorial 3 — Cut supply | 21.2s | 11.0s | 51.9% |
+| Tutorial 4 — Siege | 14.5s | 7.1s | 49.0% |
 | MVP final exam | 143.2s | 71.8s | 50.1% |
 
 Source: scripted `Simulation` routes using [`test/levels.test.ts`](../../test/levels.test.ts), measured before and after the review adjustment and recorded in [the tutorial progress record](../../agents/progress/2026-08-27-tutorial-level-progression.md).

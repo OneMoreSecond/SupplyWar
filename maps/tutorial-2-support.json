@@ -8,13 +8,19 @@
     "forcePerWidthUnit": 2
   },
   "nodes": [
-    { "id": "player-resource", "label": "Your Resource", "owner": "player", "force": 45, "production": 4, "kind": "resource", "x": 150, "y": 280 },
-    { "id": "player-base", "label": "Your Base", "owner": "player", "force": 5, "production": 0.4, "kind": "base", "x": 450, "y": 280 },
-    { "id": "enemy-base", "label": "Enemy Base", "owner": "enemy", "force": 22, "production": 0, "kind": "base", "x": 750, "y": 280 }
+    { "id": "upper-resource", "label": "Upper Supply", "owner": "player", "force": 25, "production": 3, "kind": "resource", "x": 120, "y": 120 },
+    { "id": "lower-resource", "label": "Lower Supply", "owner": "player", "force": 25, "production": 3, "kind": "resource", "x": 120, "y": 440 },
+    { "id": "player-base", "label": "Your Base", "owner": "player", "force": 5, "production": 0.4, "kind": "base", "x": 380, "y": 280 },
+    { "id": "enemy-base", "label": "Supported Base", "owner": "enemy", "force": 10.5, "production": 0, "kind": "base", "x": 620, "y": 280 },
+    { "id": "enemy-resource", "label": "Enemy Supply", "owner": "enemy", "force": 45, "production": 2, "kind": "resource", "x": 820, "y": 280 }
   ],
   "roads": [
-    { "id": "resource-supply", "a": "player-resource", "b": "player-base", "width": 2 },
-    { "id": "base-attack", "a": "player-base", "b": "enemy-base", "width": 2 }
+    { "id": "upper-supply", "a": "upper-resource", "b": "player-base", "width": 1.5 },
+    { "id": "lower-supply", "a": "lower-resource", "b": "player-base", "width": 1.5 },
+    { "id": "base-attack", "a": "player-base", "b": "enemy-base", "width": 2 },
+    { "id": "enemy-supply", "a": "enemy-resource", "b": "enemy-base", "width": 1 }
   ],
-  "initialTransports": []
+  "initialTransports": [
+    { "source": "enemy-resource", "target": "enemy-base", "owner": "enemy" }
+  ]
 }

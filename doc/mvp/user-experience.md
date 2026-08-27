@@ -9,9 +9,9 @@ Normal play starts at Tutorial 1. Each tutorial names one focal mechanism and gi
 | Order | Level | Focal mechanism | Action taught |
 | --- | --- | --- | --- |
 | 1 | Send forces | Transport and capture | Drag from a player source to an adjacent hostile target and keep the route active |
-| 2 | Allied supply | Support | Feed the player base from a resource while the base attacks |
-| 3 | Cut supply | Source capture | Compare a failing direct assault with capturing the enemy resource to cancel support |
-| 4 | Siege | Unsupported attrition | Keep attacking a stronger unsupported base while its red siege ring is active |
+| 2 | Allied supply | Support | Counter an enemy-supported base by feeding the player base from two resource nodes while it attacks |
+| 3 | Cut supply | Source capture | Compare a failing direct assault with going beyond the base to capture its supporting resource |
+| 4 | Siege | Unsupported attrition | Encircle a stronger unsupported fortress from three player positions while its red siege ring is active |
 | 5 | Supply War MVP | Final exam | Combine flanking, source capture, support cutting, and siege |
 
 Source: level metadata in [`src/levels.ts`](../../src/levels.ts) and authored maps under [`maps/`](../../maps/).
@@ -24,7 +24,9 @@ Source: level metadata in [`src/levels.ts`](../../src/levels.ts) and authored ma
 | Preview a transport | Hold the drag | Shows an arrowed dashed path and explains whether release will send force |
 | Cancel a transport | Right-click a green active road | Cancels that player transport and removes force on it |
 | Pick a level | Choose any entry from `Level` | Opens that authored tutorial or the MVP final exam |
-| Continue after victory | Select `Next level` after capturing the enemy base | Opens the next ordered level; the action is hidden before victory and after the final exam |
+| Finish a level | Capture the enemy base | Opens a congratulation dialog for authored levels; editor playtests retain their existing status-only victory feedback |
+| Replay after victory | Select `Replay level` in the completion dialog | Closes the dialog and restores the current authored map's initial state |
+| Continue after victory | Select `Next level` in the completion dialog | Opens the next ordered level; the final exam instead offers `Close` |
 | Pan the map | Drag non-interactive map space | Moves the viewport without changing map coordinates |
 | Zoom the map | Use the wheel over the canvas | Zooms around the pointer while keeping node markers readable |
 | Restart | Select `Restart map` | Reloads the authored map state |

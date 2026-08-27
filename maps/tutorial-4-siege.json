@@ -3,16 +3,20 @@
   "settings": {
     "logicTickSeconds": 0.1,
     "siegeFormula": "exponential-half-life",
-    "siegeHalfLifeSeconds": 1.25,
+    "siegeHalfLifeSeconds": 1.4,
     "secondsPerDistanceUnit": 0.005,
     "forcePerWidthUnit": 2
   },
   "nodes": [
-    { "id": "player-base", "label": "Your Small Force", "owner": "player", "force": 12, "production": 0.6, "kind": "base", "x": 180, "y": 280 },
-    { "id": "enemy-base", "label": "Unsupported Fortress", "owner": "enemy", "force": 90, "production": 0, "kind": "base", "x": 720, "y": 280 }
+    { "id": "player-base", "label": "Main Force", "owner": "player", "force": 4, "production": 0.2, "kind": "base", "x": 160, "y": 280 },
+    { "id": "north-flank", "label": "North Flank", "owner": "player", "force": 4, "production": 0.2, "kind": "ordinary", "x": 450, "y": 100 },
+    { "id": "south-flank", "label": "South Flank", "owner": "player", "force": 4, "production": 0.2, "kind": "ordinary", "x": 450, "y": 460 },
+    { "id": "enemy-base", "label": "Unsupported Fortress", "owner": "enemy", "force": 90, "production": 0, "kind": "base", "x": 680, "y": 280 }
   ],
   "roads": [
-    { "id": "siege-road", "a": "player-base", "b": "enemy-base", "width": 0.5 }
+    { "id": "main-assault", "a": "player-base", "b": "enemy-base", "width": 0.25 },
+    { "id": "north-assault", "a": "north-flank", "b": "enemy-base", "width": 0.25 },
+    { "id": "south-assault", "a": "south-flank", "b": "enemy-base", "width": 0.25 }
   ],
   "initialTransports": []
 }

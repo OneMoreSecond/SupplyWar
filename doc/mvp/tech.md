@@ -6,8 +6,8 @@ Source: user-confirmed implementation choices and repository implementation summ
 
 | Component | Responsibility | Primary location |
 | --- | --- | --- |
-| Game shell | Level picker, guidance, victory-only next action, map-editor entry, canvas, and restart control | [`index.html`](../../index.html) |
-| View and input | Level routing, Canvas rendering, visual feedback, drag/right-click commands, and independent render cadence | [`src/main.ts`](../../src/main.ts) |
+| Game shell | Level picker, guidance, completion dialog, map-editor entry, canvas, and restart control | [`index.html`](../../index.html) |
+| View and input | Level routing, Canvas rendering, victory/dialog state, visual feedback, drag/right-click commands, and independent render cadence | [`src/main.ts`](../../src/main.ts) |
 | Level catalog | Ordered tutorial/final-exam metadata and authored map configs | [`src/levels.ts`](../../src/levels.ts) |
 | Camera | Shared world/screen conversion, panning, pointer-anchored zoom, and fit-to-map | [`src/camera.ts`](../../src/camera.ts) |
 | Simulation | Deterministic ownership, production, transports, packets, capture, siege, and victory | [`src/game.ts`](../../src/game.ts) |
@@ -31,7 +31,7 @@ This shared boundary lets the browser editor change map content without coupling
 
 ## Authored level flow
 
-`src/levels.ts` is an ordered catalog of four tutorials followed by `maps/mvp.json`. It owns player-facing level names and guidance without extending `MapConfig`. Normal entry resolves `?level=<id>` and defaults unknown or missing IDs to Tutorial 1. The picker changes that query; player victory reveals `Next level` only when the catalog has a successor. The final exam has none. Source: user goal; implementation: [`src/levels.ts`](../../src/levels.ts), [`src/main.ts`](../../src/main.ts), and [`index.html`](../../index.html).
+`src/levels.ts` is an ordered catalog of four tutorials followed by `maps/mvp.json`. It owns player-facing level names and guidance without extending `MapConfig`. Normal entry resolves `?level=<id>` and defaults unknown or missing IDs to Tutorial 1. The picker changes that query. An authored player victory opens one native completion dialog: tutorials offer replay and the catalog successor, while the final exam offers replay and close. Source: user goal and review; implementation: [`src/levels.ts`](../../src/levels.ts), [`src/main.ts`](../../src/main.ts), and [`index.html`](../../index.html).
 
 Editor `?playtest=1` remains a separate, higher-priority route: it hides authored-level controls and runs the validated `sessionStorage` draft. Missing or invalid draft storage retains the existing MVP fallback. Source: existing playtest contract and [`src/main.ts`](../../src/main.ts).
 

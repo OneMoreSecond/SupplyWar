@@ -11,6 +11,10 @@ const restart = document.querySelector<HTMLButtonElement>("#restart")!;
 const editorLink = document.querySelector<HTMLAnchorElement>("#editor-link")!;
 const levelControl = document.querySelector<HTMLElement>("#level-control")!;
 const levelPicker = document.querySelector<HTMLSelectElement>("#level-picker")!;
+const completionDialog = document.querySelector<HTMLDialogElement>("#level-complete-dialog")!;
+const completionTitle = document.querySelector<HTMLElement>("#level-complete-title")!;
+const completionMessage = document.querySelector<HTMLElement>("#level-complete-message")!;
+const replayLevelButton = document.querySelector<HTMLButtonElement>("#replay-level")!;
 const nextLevelButton = document.querySelector<HTMLButtonElement>("#next-level")!;
 const speedControl = document.querySelector<HTMLElement>("#speed-control")!;
 const speedInput = document.querySelector<HTMLInputElement>("#playtest-speed")!;
@@ -80,10 +84,6 @@ levelPicker.addEventListener("change", () => {
   window.location.search = `?level=${encodeURIComponent(levelPicker.value)}`;
 });
 
-nextLevelButton.addEventListener("click", () => {
-  if (successor) window.location.search = `?level=${encodeURIComponent(successor.id)}`;
-});
-
 let game = new Simulation(config);
 const camera = new Camera2D(canvas.width, canvas.height);
 camera.fit(config.nodes);
@@ -93,7 +93,39 @@ let pan: { pointerId: number; last: Point2D } | null = null;
 let lastFrame = performance.now();
 let accumulator = 0;
 let speedMultiplier = 1;
+let completionShown = false;
 const colors: Record<Owner, string> = { player: "#42c97a", enemy: "#ed5d62", neutral: "#8d9aa7" };
+
+function resetLevel(): void {
+  game = new Simulation(config);
+  accumulator = 0;
+  completionShown = false;
+  completionDialog.close();
+}
+
+function showLevelCompletion(): void {
+  if (completionShown || page.mode !== "level") return;
+  completionShown = true;
+  completionTitle.textContent = `${page.level.pickerLabel} complete!`;
+  if (successor) {
+    completionMessage.textContent = `Congratulations. Next: ${successor.pickerLabel}.`;
+    nextLevelButton.textContent = "Next level";
+  } else {
+    completionMessage.textContent = "Congratulations. You cleared the Supply War campaign.";
+    nextLevelButton.textContent = "Close";
+  }
+  completionDialog.showModal();
+}
+
+replayLevelButton.addEventListener("click", resetLevel);
+
+nextLevelButton.addEventListener("click", () => {
+  if (successor) {
+    window.location.search = `?level=${encodeURIComponent(successor.id)}`;
+    return;
+  }
+  completionDialog.close();
+});
 
 function toCanvas(event: MouseEvent): Point2D {
   const rect = canvas.getBoundingClientRect();
@@ -233,7 +265,6 @@ function render(): void {
   canvas.dataset.cameraY = camera.centerY.toFixed(2);
   canvas.dataset.cameraZoom = camera.zoom.toFixed(4);
   const target = dragPoint ? nodeAt(dragPoint) : undefined;
-  nextLevelButton.hidden = game.winner !== "player" || !successor;
   if (game.winner === "player" && successor && page.level) {
     status.textContent = `Victory — ${page.level.pickerLabel} complete. Continue to ${successor.pickerLabel}.`;
   } else if (game.winner === "player" && page.level?.kind === "final-exam") {
@@ -247,6 +278,7 @@ function render(): void {
   } else {
     status.textContent = "Capture the enemy base to win.";
   }
+  if (game.winner === "player") showLevelCompletion();
 }
 
 function frame(now: number): void {
@@ -332,8 +364,7 @@ canvas.addEventListener("wheel", (event) => {
 }, { passive: false });
 
 restart.addEventListener("click", () => {
-  game = new Simulation(config);
-  accumulator = 0;
+  resetLevel();
 });
 
 requestAnimationFrame(frame);
