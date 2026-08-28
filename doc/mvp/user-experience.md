@@ -1,73 +1,59 @@
-# MVP User Experience
+# Supply War User Experience
 
-Source: user-confirmed onboarding and visual-feedback decisions in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), Sections 4 and 7, map-editor requirements in [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md), and level-flow requirements in [the tutorial progress record](../../agents/progress/2026-08-27-tutorial-level-progression.md), summarized on 2026-08-27.
+Status: six-level navigation, the full-visibility Central Campaign baseline, semantic node shapes, and road hierarchy are implemented. Fog, Interdiction, font, and HUD work remain pending.
 
-## Learning progression
+Source: current browser implementation, authored metadata in [`src/levels.ts`](../../src/levels.ts), and [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md), updated 2026-08-28.
 
-Normal play starts at Tutorial 1. Each tutorial names one focal mechanism and gives one concrete action; the existing MVP scenario is the final exam. Source: user tutorial goal; implementation: [`src/levels.ts`](../../src/levels.ts).
+## Learning and play progression
 
-| Order | Level | Focal mechanism | Action taught |
+| Order | Level | Focal experience | Source |
+| ---: | --- | --- | --- |
+| 1 | Send forces | Transport and capture | [`src/levels.ts`](../../src/levels.ts) |
+| 2 | Allied supply | Feed an attack from two resources | [`src/levels.ts`](../../src/levels.ts) |
+| 3 | Cut supply | Compare a failing direct attack with source capture | [`src/levels.ts`](../../src/levels.ts) |
+| 4 | Siege | Siege an ordinary fortress, then packet-capture its base | [`src/levels.ts`](../../src/levels.ts), [`maps/tutorial-4-siege.json`](../../maps/tutorial-4-siege.json) |
+| 5 | Supply War MVP | Combine resource capture, rooted support cutting, siege, and base capture | [`src/levels.ts`](../../src/levels.ts), [`maps/mvp.json`](../../maps/mvp.json) |
+| 6 | The Central Campaign | Expand across a large map against deterministic enemy commands | [`src/levels.ts`](../../src/levels.ts), [`maps/demo.json`](../../maps/demo.json) |
+
+Normal entry starts at Tutorial 1; unknown IDs fall back there. The picker can open any level. Victory offers replay and the next level, while the final Demo offers close. Editor playtests stay isolated from authored completion dialogs. Source: [`src/main.ts`](../../src/main.ts), [`src/levels.ts`](../../src/levels.ts), and navigation tests in [`test/levels.test.ts`](../../test/levels.test.ts).
+
+## Game controls
+
+| Action | Input | Result | Source |
 | --- | --- | --- | --- |
-| 1 | Send forces | Transport and capture | Drag from a player source to an adjacent hostile target and keep the route active |
-| 2 | Allied supply | Support | Counter an enemy-supported base by feeding the player base from two resource nodes while it attacks |
-| 3 | Cut supply | Source capture | Compare a failing direct assault with going beyond the base to capture its supporting resource |
-| 4 | Siege | Unsupported attrition | Encircle a stronger unsupported fortress from three player positions while its red siege ring is active |
-| 5 | Supply War MVP | Final exam | Combine flanking, source capture, support cutting, and siege |
+| Start transport | Drag from a green owned node to an adjacent node | Starts a route when its road is unused | [`src/main.ts`](../../src/main.ts) |
+| Preview transport | Hold the drag | Shows direction and valid/invalid target feedback | [`src/main.ts`](../../src/main.ts) |
+| Cancel transport | Right-click a green active road | Cancels that route and removes its packets | [`src/main.ts`](../../src/main.ts), [`src/game.ts`](../../src/game.ts) |
+| Pick level | Choose from `Level` | Opens one of six authored scenarios | [`src/main.ts`](../../src/main.ts), [`src/levels.ts`](../../src/levels.ts) |
+| Pan / zoom | Drag empty map space / wheel | Navigates unbounded world coordinates | [`src/main.ts`](../../src/main.ts), [`src/camera.ts`](../../src/camera.ts) |
+| Restart | Select `Restart map` | Restores the current map and AI cadence | [`src/main.ts`](../../src/main.ts) |
+| Finish | Capture `enemy-base` | Opens authored completion UI | [`src/main.ts`](../../src/main.ts) |
+| Lose | Enemy captures `player-base` | Stops simulation and shows explicit defeat status | [`src/game.ts`](../../src/game.ts), [`src/main.ts`](../../src/main.ts) |
 
-Source: level metadata in [`src/levels.ts`](../../src/levels.ts) and authored maps under [`maps/`](../../maps/).
+## Current visual language
 
-## Controls
-
-| Action | Input | Result |
+| State | Presentation | Source |
 | --- | --- | --- |
-| Start a transport | Drag from a green player-owned node to an adjacent node | Starts a player transport if its road is unused |
-| Preview a transport | Hold the drag | Shows an arrowed dashed path and explains whether release will send force |
-| Cancel a transport | Right-click a green active road | Cancels that player transport and removes force on it |
-| Pick a level | Choose any entry from `Level` | Opens that authored tutorial or the MVP final exam |
-| Finish a level | Capture the enemy base | Opens a congratulation dialog for authored levels; editor playtests retain their existing status-only victory feedback |
-| Replay after victory | Select `Replay level` in the completion dialog | Closes the dialog and restores the current authored map's initial state |
-| Continue after victory | Select `Next level` in the completion dialog | Opens the next ordered level; the final exam instead offers `Close` |
-| Pan the map | Drag non-interactive map space | Moves the viewport without changing map coordinates |
-| Zoom the map | Use the wheel over the canvas | Zooms around the pointer while keeping node markers readable |
-| Restart | Select `Restart map` | Reloads the authored map state |
-| Open the editor | Select `Map editor` | Opens the browser map editor in the same site |
+| Ownership | Green player, red enemy, grey neutral | [`src/main.ts`](../../src/main.ts) |
+| Node role | Star base, square resource, circular ordinary node; base/resource production appears above | [`src/main.ts`](../../src/main.ts) |
+| Active route | Owner-colored line with animated white direction triangles | [`src/main.ts`](../../src/main.ts) |
+| Unsupported siege | Pulsing bright-red ring | [`src/main.ts`](../../src/main.ts) |
+| Road capacity / latency | Stroke thickness follows capacity; roads with multiplier above `1` use a broken pattern | [`src/game.ts`](../../src/game.ts), [`src/main.ts`](../../src/main.ts) |
+| Fog / Interdiction | Not shown because both rules remain disabled | [`src/game.ts`](../../src/game.ts), [`maps/demo.json`](../../maps/demo.json) |
 
-Source: user-confirmed input and level-flow decisions; implementation: [`src/main.ts`](../../src/main.ts) and [`src/levels.ts`](../../src/levels.ts).
+At the Demo's 50.7% fit zoom, shortened labels, semantic shapes, separate special-node label offsets, and width/latency road styling make the full topology readable. Animated route arrows may still cross nearby text briefly, so human Gate C should include a legibility question. Source: inspected production screenshot [`demo-baseline.png`](../../agents/tmp/2026-08-28-demo-plan/output/demo-baseline.png), 2026-08-28.
 
-## Visual language
+## Demo briefing
 
-| State | Presentation | Purpose |
-| --- | --- | --- |
-| Ownership | Green = player, red = enemy, grey = neutral | Read who controls each node and route |
-| Force | Rounded number inside each node | Read immediate strength |
-| Node role | White base ring; gold resource ring and label | Identify production sources and victory target |
-| Active transport | Owner-colored road with animated white triangles from transport source to target | Read occupancy and actual flow direction |
-| Valid drag target | Green dashed arrow and target ring | Confirm a release will start a transport |
-| Invalid drag | Grey dashed arrow and explicit guidance | Explain why no transport will start yet |
-| Unsupported siege | Pulsing bright-red ring | Distinguish active attrition from the gold resource-node marker |
+The current Demo tells the player to secure nearby resources before the enemy reaches the center and points out the long slow northern bypass. The hint makes the intended first strategic choice visible while the map is still fully observable. Source: [`src/levels.ts`](../../src/levels.ts) and prototype preference recorded in [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md).
 
-Source: user visual-feedback decisions and browser verification; implementation: [`src/main.ts`](../../src/main.ts), [`src/style.css`](../../src/style.css).
+## Map editor flow
 
-## Map-editor flow
+The separate editor loads/saves version-1 and version-2 JSON; exposes global settings and one selected node/road inspector; adds roads through connector dragging; edits a road's optional initial transport and version-2 travel multiplier; pans, zooms, and fits large maps; validates before save/playtest; and preserves its browser-local playtest round trip. Source: [`editor.html`](../../editor.html), [`src/editor.ts`](../../src/editor.ts), and [`src/playtest.ts`](../../src/playtest.ts).
 
-| Action | Input | Result |
-| --- | --- | --- |
-| Load a map | Select `Load JSON`, then a `.json` file | A valid version-1 map replaces the draft; an invalid file leaves it unchanged and explains the correction needed |
-| Select an object | Select a node or road in the preview | Shows only that object's editable fields in the inspector |
-| Edit values | Use global settings and the selected-object inspector | Updates the draft and preview immediately; node ID changes preserve its road/transport references |
-| Move a node | Drag the node body or enter exact `X` / `Y` values | Updates the node coordinates |
-| Create a road | Drag a node's square connector onto another node | Adds and selects a width-1 road; selecting an existing connection chooses that road instead of duplicating it |
-| Edit an initial transport | Select a road, then use its `Initial transport` subsection | Adds, edits, or removes that road's optional one transport |
-| Navigate a large map | Drag empty preview space, use the wheel, or select `Fit map` | Pans or zooms the unbounded coordinate space without altering authored coordinates |
-| Change collections | Select `Add node`, connector-drag a road, or a selected object's `Remove` action | Adds or removes the chosen draft item; removing a road also removes its initial transport |
-| Save a map | Select `Save JSON` when the map is valid | Downloads formatted JSON under the current map filename |
-| Playtest | Select `Playtest current map` when the draft is valid | Runs the current editor draft in the game without changing the authored map |
-| Accelerate playtest | Move the playtest-only `Speed` bar from 1× up to 8× | Advances more fixed simulation steps per real second without changing the authored logic tick |
-| Return from playtest | Select `Back to editor` | Restores the same draft and filename for continued editing |
-| Reset | Select `Reset to MVP`, then confirm | Replaces the draft with the authored MVP map; canceling preserves the current draft |
+## Pending player-facing work
 
-The validation status states whether saving and playtesting are available and gives a specific correction when the draft is invalid. Failed file loads and canceled resets state that the current map was not changed. Source: error-state requirements from the error-message skill; implementation and browser evidence in [`src/editor.ts`](../../src/editor.ts) and [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md).
-
-## Final-exam play
-
-After the four tutorials, the player should recognize that the nearby strong frontline is dangerous, see the distant resource as its source of support, capture that resource through the long flank route, siege the frontline, and then take the enemy base. The adjusted intended final-exam route takes about 72 simulation seconds. Source: user tutorial review, authored balance values, and the current geometry-aware model.
+- Confirm dense-map labels and animated routes remain understandable during Gate C human play. Source: updated visual inspection and Phase E acceptance in the Demo progress record.
+- Add fog visibility/discovery only after the full-visibility loop passes Gate C. Source: approved phase order in the Demo progress record.
+- Add Interdiction targeting, cooldown, disruption timer, and invalid-target guidance with the simulation rule. Source: pending Phase D.
+- Bundle Barlow and refine the surrounding HUD while preserving the implemented star/square/circle language. Source: user requirements in [`doc/Demo.md`](../Demo.md) and pending Phase E.

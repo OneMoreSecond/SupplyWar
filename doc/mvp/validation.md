@@ -1,40 +1,57 @@
-# MVP Validation
+# Supply War Validation
 
-Source: local validation evidence recorded in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), Sections 7.2–7.8 and 7.11, [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md), and [the tutorial progress record](../../agents/progress/2026-08-27-tutorial-level-progression.md), summarized on 2026-08-27.
+Status: Phase A/B automated checks and the production large-map smoke test pass; qualitative Gate C remains open.
 
-## Automated checks
+Source: local commands and browser evidence recorded in [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md), 2026-08-28.
 
-| Command | Coverage | Recorded result |
+## Current checks
+
+| Check | Coverage | Current result | Source |
+| --- | --- | --- | --- |
+| `npm run typecheck` | TypeScript across game, AI, editor, and tests | Passed | Local output, 2026-08-28 |
+| `npm test` | 4 files and 36 deterministic tests | Passed | Local Vitest output, 2026-08-28 |
+| `npm run build` | Production game/editor bundles and JSON imports | Passed | Local Vite 8.2.2 output, 2026-08-28 |
+| Demo production browser smoke | Six-level picker, Demo route/mode, AI expansion, active routes, screenshot | Passed | [`demo_browser_check.mjs`](../../agents/tmp/2026-08-28-demo-plan/script/demo_browser_check.mjs), 2026-08-28 |
+| Production browser regression | Tutorial completion/successor, final-exam/Demo routing, version conversion, unsupported-rule feedback, editor playtest round trip | Passed | [`browser_regression.mjs`](../../agents/tmp/2026-08-28-demo-plan/script/browser_regression.mjs), 2026-08-28 |
+| Human Gate C | Expansion, resource contact, advantage break, finish, and no long stall | Pending | Acceptance criteria in the Demo progress record |
+
+## Automated coverage
+
+| Area | Cases | Source |
 | --- | --- | --- |
-| `npm run typecheck` | TypeScript correctness | Passed |
-| `npm test` | Simulation/map validation, shared camera, five-level catalog, tutorial choices, and time targets | Passed: 23 tests |
-| `npm run build` | Production game and editor bundle | Passed |
-| `python3 agents/tmp/2026-08-26-game-demo-plan-grill/script/balance_model.py` | Geometry- and width-aware tactical/direct balance scenarios | Intended path succeeds; direct assault fails |
+| Versioning | Version-1 acceptance/upgrade, explicit direct behavior, version-2 rule object, required road multiplier, invalid unsupported feature flags | [`test/game.test.ts`](../../test/game.test.ts) |
+| Transport | Geometry, latency multiplier, width throughput, source cancellation, target mode refresh | [`test/game.test.ts`](../../test/game.test.ts) |
+| Rooted siege | Root immunity, rooted multi-hop chain, isolated cycle, rooted cycle, root capture, surrender | [`test/game.test.ts`](../../test/game.test.ts) |
+| Map validation | External roots, node fields, unique road IDs/topology, transport ownership, permitted crossings | [`test/game.test.ts`](../../test/game.test.ts) |
+| AI | Deterministic resource choice, defense priority, weak-node attack, reserve cancellation, wait | [`test/ai.test.ts`](../../test/ai.test.ts) |
+| Camera | Round trips, anchored zoom, wide-map fit, and pan | [`test/camera.test.ts`](../../test/camera.test.ts) |
+| Authored progression | Six-map order/navigation, tutorial tactics/timing, revised fortress/base flow, MVP route, Demo composition and AI expansion | [`test/levels.test.ts`](../../test/levels.test.ts) |
 
-Source: recorded local validation and repository scripts.
+## Revised authored balance
 
-## Test cases
+| Scenario | Result | Source |
+| --- | --- | --- |
+| Tutorial 3 intended route | Victory at 11.1s | Local scripted measurement, 2026-08-28 |
+| Tutorial 4 | Fortress at 7.1s; base victory at 12.0s | Local scripted measurement, 2026-08-28 |
+| MVP intended route | Resource 10.7s; frontline 36.9s; victory 71.7s | Local scripted measurement, 2026-08-28 |
+| MVP direct frontline assault | Frontline remains enemy-owned through 240s | [`test/game.test.ts`](../../test/game.test.ts) |
 
-The Vitest suite covers road geometry/throughput derivation, configured siege-formula selection, source-change cancellation, target-change refresh to attack, siege surrender, the intended resource-cut win, direct-frontline failure, authored-map acceptance, permitted road crossings, malformed external roots, node-field validation, duplicate road IDs, unusable initial transports, world/screen round trips, anchored zoom, wide-map fitting, panning, catalog order/default/successor boundaries, and all five map validations. Tutorial coverage additionally proves that active enemy support suppresses siege in Tutorial 2, an unsupported direct attack fails, both player feeds produce the intended win, Tutorial 3's resource is behind its base and its supply-cut route succeeds, Tutorial 4 has two side positions connected to its fortress, and every intended route remains inside its completion-time bound. Source: [`test/game.test.ts`](../../test/game.test.ts), [`test/camera.test.ts`](../../test/camera.test.ts), and [`test/levels.test.ts`](../../test/levels.test.ts).
+The revised values preserve the previous roughly 72-second MVP target while changing the final base from siege capture to packet capture. Source: authored JSON, local measurements, and regression bounds in [`test/levels.test.ts`](../../test/levels.test.ts).
 
-## Tactical balance evidence
+## Production Demo evidence
 
-| Scenario | Result |
-| --- | --- |
-| Intended route | Resource at 16.7s, frontline at 44.9s, enemy base at 71.6s |
-| Direct frontline assault | Frontline remains enemy-owned with 260.7 force at 240s |
-| Target pacing | Intended route is approximately half the preceding 143.2s simulation result |
+Headless Chromium opened `?level=demo`, found all six ordered options, confirmed the Demo label and canvas route, then observed the enemy grow from 9 to 13 nodes with 5 active enemy transports at simulation second 18. The camera fit zoom was `0.5067`. Source: [`demo_browser_check.mjs`](../../agents/tmp/2026-08-28-demo-plan/script/demo_browser_check.mjs) and local output, 2026-08-28.
 
-Source: [`agents/tmp/2026-08-26-game-demo-plan-grill/script/balance_model.py`](../../agents/tmp/2026-08-26-game-demo-plan-grill/script/balance_model.py) and the recorded model run.
+The initial screenshot exposed dense label overlap. After shortening authored labels and adding semantic shapes, capacity-aware strokes, poor-road patterns, and separate special-node label offsets, the refreshed full-page screenshot is readable at the same fit zoom; active arrows remain a human-play observation. Source: inspected [`demo-baseline.png`](../../agents/tmp/2026-08-28-demo-plan/output/demo-baseline.png), 2026-08-28.
 
-## Browser evidence
+## Historical regression evidence
 
-Headless Chromium completed the full hinted route and reported victory after the distant-rear layout. Separate browser checks verified held-drag feedback and cancellation of a player route. Evidence scripts and screenshots are retained under [`agents/tmp/2026-08-26-game-demo-plan-grill/`](../../agents/tmp/2026-08-26-game-demo-plan-grill/). Source: recorded Chromium validation.
+The existing production workflows previously covered full tutorial/final-exam navigation and the complete editor load/save/reset/camera/playtest surface. Those scripts remain under [`agents/tmp/2026-08-27-tutorial-level-progression/`](../../agents/tmp/2026-08-27-tutorial-level-progression/) and [`agents/tmp/2026-08-27-browser-map-editor/`](../../agents/tmp/2026-08-27-browser-map-editor/). Source: prior progress records and retained evidence.
 
-Headless Chromium also opened the editor from the game page; verified the selection-only inspector and road-scoped transport editor; created and selected a road by connector dragging; moved a node; observed invalid-edit save/playtest blocking; preserved the draft after malformed import and canceled reset; confirmed reset; verified downloaded JSON; and completed an editor → playtest → editor draft/filename round trip. A large map spanning `(-2000, -1500)` to `(8000, 5000)` fit at 6.46% zoom in both pages; editor pan and wheel zoom passed; and 8× consistently advanced more than four times as much simulation time as 1× over equal waits (representative run: 3.2s versus 0.4s). Full-page editor and playtest visuals were inspected, including the separate red siege and gold resource rings. Evidence is retained under [`agents/tmp/2026-08-27-browser-map-editor/`](../../agents/tmp/2026-08-27-browser-map-editor/). Source: local browser validation, 2026-08-27.
+The current focused regression verified the changed surfaces: six-level navigation, Tutorial 1 completion and successor, final-exam/Demo labels, all 14 version-2 settings, five-field version-2 and four-field version-1 road inspectors, valid two-way schema conversion, explicit unsupported-fog feedback, and editor→playtest→editor restoration. Source: [`browser_regression.mjs`](../../agents/tmp/2026-08-28-demo-plan/script/browser_regression.mjs) and local output, 2026-08-28.
 
-The tutorial production-browser check verified five ordered picker entries; Tutorial 1 default and mechanism guidance; a hidden completion dialog before victory; a roughly 2.5-second browser victory opening a congratulation dialog with replay and next actions; and navigation to Tutorial 2. It also verified Tutorial 2's two player feeds and enemy support, Tutorial 3's resource beyond its base and failing direct choice, Tutorial 4's three-direction siege, the MVP final-exam victory dialog and close action, safe unknown-level fallback, and isolation of editor playtest/fallback from authored-level completion controls. Completion, reviewed Tutorials 2–4, final-exam, and final-exam-completion screenshots were inspected. Evidence is retained under [`agents/tmp/2026-08-27-tutorial-level-progression/`](../../agents/tmp/2026-08-27-tutorial-level-progression/). Source: local browser validation, 2026-08-27.
+## Remaining acceptance risk
 
-## Remaining risk
-
-The completed checks validate rules, all five authored maps, tutorial and final-exam navigation, both production pages, game/editor controls, the map-file round trip, and scripted intended paths. Additional human feedback remains useful for qualitative tutorial wording and pacing, but is not an MVP acceptance blocker. Campaign persistence and locking remain explicitly outside current scope. Source: progress-record completion audits.
+- Gate C needs human play before fog or Interdiction is enabled. Source: approved phase order in the Demo progress record.
+- The 10–15-minute target, four match stages, reversal frequency, and no-stall condition have not been measured. Source: user requirement in [`doc/Demo.md`](../Demo.md) and Gate F criteria.
+- Human play must confirm label/route readability before information is hidden. Source: refreshed production screenshot and design judgment.

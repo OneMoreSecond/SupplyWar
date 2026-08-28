@@ -2,12 +2,34 @@ export type Owner = "player" | "enemy" | "neutral";
 export type NodeKind = "base" | "resource" | "ordinary";
 
 export interface MapNode { id: string; label: string; owner: Owner; force: number; production: number; kind: NodeKind; x: number; y: number; }
-export interface Road { id: string; a: string; b: string; width: number; }
+interface RoadFields { id: string; a: string; b: string; width: number; }
+export interface RoadV1 extends RoadFields { travelTimeMultiplier?: never; }
+export interface RoadV2 extends RoadFields { travelTimeMultiplier: number; }
+export type Road = RoadV1 | RoadV2;
 export interface MapTransport { source: string; target: string; owner: Owner; }
 export interface SiegeFormula { id: string; apply(force: number, dt: number, halfLifeSeconds: number): number; }
 export const exponentialHalfLifeSiege: SiegeFormula = { id: "exponential-half-life", apply: (force, dt, halfLifeSeconds) => force * 0.5 ** (dt / halfLifeSeconds) };
 const siegeFormulas: Record<string, SiegeFormula> = { [exponentialHalfLifeSiege.id]: exponentialHalfLifeSiege };
-export interface MapConfig { version: number; settings: { logicTickSeconds: number; siegeFormula: string; siegeHalfLifeSeconds: number; secondsPerDistanceUnit: number; forcePerWidthUnit: number }; nodes: MapNode[]; roads: Road[]; initialTransports: MapTransport[]; }
+
+export interface MapSettingsV1 {
+  logicTickSeconds: number;
+  siegeFormula: string;
+  siegeHalfLifeSeconds: number;
+  secondsPerDistanceUnit: number;
+  forcePerWidthUnit: number;
+}
+
+export interface RuleSettings {
+  siegeSupport: "direct" | "rooted";
+  computerAI: { enabled: boolean; decisionIntervalSeconds: number; reserveForce: number };
+  fogOfWar: { enabled: boolean };
+  interdiction: { enabled: boolean; durationSeconds: number; cooldownSeconds: number };
+}
+
+export interface MapSettingsV2 extends MapSettingsV1 { rules: RuleSettings; }
+export interface MapConfigV1 { version: 1; settings: MapSettingsV1; nodes: MapNode[]; roads: RoadV1[]; initialTransports: MapTransport[]; }
+export interface MapConfigV2 { version: 2; settings: MapSettingsV2; nodes: MapNode[]; roads: RoadV2[]; initialTransports: MapTransport[]; }
+export type MapConfig = MapConfigV1 | MapConfigV2;
 export interface NodeState extends MapNode { force: number; }
 export interface Packet { force: number; arrivalAt: number; }
 export interface Transport extends MapTransport { id: string; roadId: string; active: boolean; packets: Packet[]; }
@@ -15,9 +37,9 @@ export interface Transport extends MapTransport { id: string; roadId: string; ac
 const roadKey = (a: string, b: string) => [a, b].sort().join(":");
 
 export class Simulation {
-  readonly config: MapConfig;
+  readonly config: MapConfigV2;
   readonly nodes = new Map<string, NodeState>();
-  readonly roads = new Map<string, Road>();
+  readonly roads = new Map<string, RoadV2>();
   readonly transports: Transport[] = [];
   time = 0;
   winner: Owner | null = null;
@@ -25,21 +47,25 @@ export class Simulation {
   private readonly siegeFormula: SiegeFormula;
 
   constructor(config: MapConfig) {
-    validateMap(config);
-    this.config = structuredClone(config);
+    this.config = upgradeMap(config);
     this.siegeFormula = siegeFormulas[this.config.settings.siegeFormula]!;
-    for (const node of config.nodes) this.nodes.set(node.id, { ...node });
-    for (const road of config.roads) this.roads.set(road.id, { ...road });
-    for (const transport of config.initialTransports) this.startTransport(transport.source, transport.target, transport.owner);
+    for (const node of this.config.nodes) this.nodes.set(node.id, { ...node });
+    for (const road of this.config.roads) this.roads.set(road.id, { ...road });
+    for (const transport of this.config.initialTransports) this.startTransport(transport.source, transport.target, transport.owner);
   }
 
   node(id: string): NodeState { const node = this.nodes.get(id); if (!node) throw new Error(`Unknown node: ${id}`); return node; }
-  roadBetween(a: string, b: string): Road | undefined { return [...this.roads.values()].find((road) => roadKey(road.a, road.b) === roadKey(a, b)); }
+  roadBetween(a: string, b: string): RoadV2 | undefined { return [...this.roads.values()].find((road) => roadKey(road.a, road.b) === roadKey(a, b)); }
   activeOnRoad(roadId: string): Transport | undefined { return this.transports.find((transport) => transport.active && transport.roadId === roadId); }
   mode(transport: Transport): "support" | "attack" { return this.node(transport.target).owner === transport.owner ? "support" : "attack"; }
-  roadLength(road: Road): number { const a = this.node(road.a); const b = this.node(road.b); return Math.hypot(a.x - b.x, a.y - b.y); }
-  travelSeconds(road: Road): number { return this.roadLength(road) * this.config.settings.secondsPerDistanceUnit; }
-  throughput(road: Road): number { return road.width * this.config.settings.forcePerWidthUnit; }
+  isSupplied(nodeId: string): boolean {
+    const node = this.node(nodeId);
+    if (this.config.settings.rules.siegeSupport === "rooted") return this.suppliedNodes(node.owner).has(node.id);
+    return this.transports.some((transport) => transport.active && transport.target === node.id && this.mode(transport) === "support");
+  }
+  roadLength(road: RoadV2): number { const a = this.node(road.a); const b = this.node(road.b); return Math.hypot(a.x - b.x, a.y - b.y); }
+  travelSeconds(road: RoadV2): number { return this.roadLength(road) * this.config.settings.secondsPerDistanceUnit * road.travelTimeMultiplier; }
+  throughput(road: RoadV2): number { return road.width * this.config.settings.forcePerWidthUnit; }
 
   startTransport(source: string, target: string, owner = this.node(source).owner): Transport | null {
     if (this.winner || owner === "neutral" || this.node(source).owner !== owner) return null;
@@ -94,14 +120,41 @@ export class Simulation {
   }
 
   private applySiege(dt: number): void {
+    const rootedSupply = this.config.settings.rules.siegeSupport === "rooted"
+      ? new Map<Owner, Set<string>>([
+        ["player", this.suppliedNodes("player")],
+        ["enemy", this.suppliedNodes("enemy")],
+        ["neutral", new Set()],
+      ])
+      : undefined;
     for (const node of this.nodes.values()) {
       const targeting = this.transports.filter((transport) => transport.active && transport.target === node.id);
       const attackers = targeting.filter((transport) => this.mode(transport) === "attack");
       const supporters = targeting.filter((transport) => this.mode(transport) === "support");
-      if (attackers.length === 0 || supporters.length > 0) continue;
+      const supplied = rootedSupply ? rootedSupply.get(node.owner)!.has(node.id) : supporters.length > 0;
+      if (attackers.length === 0 || supplied) continue;
       node.force = this.siegeFormula.apply(node.force, dt, this.config.settings.siegeHalfLifeSeconds);
       if (node.force <= 0.01) { node.owner = attackers[0]!.owner; node.force = 0; }
     }
+  }
+
+  private suppliedNodes(owner: Owner): Set<string> {
+    if (owner === "neutral") return new Set();
+    const supplied = new Set(
+      [...this.nodes.values()]
+        .filter((node) => node.owner === owner && (node.kind === "base" || node.kind === "resource"))
+        .map((node) => node.id),
+    );
+    let changed = true;
+    while (changed) {
+      changed = false;
+      for (const transport of this.transports) {
+        if (!transport.active || transport.owner !== owner || this.mode(transport) !== "support" || !supplied.has(transport.source) || supplied.has(transport.target)) continue;
+        supplied.add(transport.target);
+        changed = true;
+      }
+    }
+    return supplied;
   }
 
   private dispatchPackets(dt: number): void {
@@ -121,9 +174,45 @@ const nodeKinds: NodeKind[] = ["base", "resource", "ordinary"];
 const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
 const isFiniteNumber = (value: unknown): value is number => typeof value === "number" && Number.isFinite(value);
 
+const legacyRules: RuleSettings = {
+  siegeSupport: "direct",
+  computerAI: { enabled: false, decisionIntervalSeconds: 1, reserveForce: 10 },
+  fogOfWar: { enabled: false },
+  interdiction: { enabled: false, durationSeconds: 10, cooldownSeconds: 60 },
+};
+
+export function upgradeMap(config: MapConfig): MapConfigV2 {
+  validateMap(config);
+  if (config.version === 2) return structuredClone(config);
+  return {
+    ...structuredClone(config),
+    version: 2,
+    settings: { ...structuredClone(config.settings), rules: structuredClone(legacyRules) },
+    roads: config.roads.map((road) => ({ ...road, travelTimeMultiplier: 1 })),
+  };
+}
+
+function validateVersion2Rules(value: unknown): void {
+  if (!isRecord(value)) throw new Error("Version 2 rules must be a JSON object");
+  if (value.siegeSupport !== "direct" && value.siegeSupport !== "rooted") throw new Error("siegeSupport must be direct or rooted");
+  if (!isRecord(value.computerAI)) throw new Error("computerAI rules must be a JSON object");
+  if (typeof value.computerAI.enabled !== "boolean") throw new Error("computerAI enabled must be true or false");
+  if (!isFiniteNumber(value.computerAI.decisionIntervalSeconds) || value.computerAI.decisionIntervalSeconds <= 0) throw new Error("computerAI decisionIntervalSeconds must be a number greater than 0");
+  if (!isFiniteNumber(value.computerAI.reserveForce) || value.computerAI.reserveForce < 0) throw new Error("computerAI reserveForce must be a number greater than or equal to 0");
+  if (!isRecord(value.fogOfWar)) throw new Error("fogOfWar rules must be a JSON object");
+  if (typeof value.fogOfWar.enabled !== "boolean") throw new Error("fogOfWar enabled must be true or false");
+  if (value.fogOfWar.enabled) throw new Error("Fog of war is not implemented yet; fogOfWar enabled must be false");
+  if (!isRecord(value.interdiction)) throw new Error("interdiction rules must be a JSON object");
+  if (typeof value.interdiction.enabled !== "boolean") throw new Error("interdiction enabled must be true or false");
+  if (value.interdiction.enabled) throw new Error("Interdiction is not implemented yet; interdiction enabled must be false");
+  for (const key of ["durationSeconds", "cooldownSeconds"] as const) {
+    if (!isFiniteNumber(value.interdiction[key]) || value.interdiction[key] <= 0) throw new Error(`interdiction ${key} must be a number greater than 0`);
+  }
+}
+
 export function validateMap(value: unknown): asserts value is MapConfig {
   if (!isRecord(value)) throw new Error("The map root must be a JSON object");
-  if (value.version !== 1) throw new Error("Version must be 1");
+  if (value.version !== 1 && value.version !== 2) throw new Error("Version must be 1 or 2");
   if (!isRecord(value.settings)) throw new Error("Settings must be a JSON object");
 
   const settings = value.settings;
@@ -131,6 +220,7 @@ export function validateMap(value: unknown): asserts value is MapConfig {
   for (const key of ["logicTickSeconds", "siegeHalfLifeSeconds", "secondsPerDistanceUnit", "forcePerWidthUnit"] as const) {
     if (!isFiniteNumber(settings[key]) || settings[key] <= 0) throw new Error(`${key} must be a number greater than 0`);
   }
+  if (value.version === 2) validateVersion2Rules(settings.rules);
 
   if (!Array.isArray(value.nodes) || value.nodes.length === 0) throw new Error("Add at least one node");
   const ids = new Set<string>();
@@ -160,6 +250,7 @@ export function validateMap(value: unknown): asserts value is MapConfig {
     if (typeof candidate.a !== "string" || typeof candidate.b !== "string" || !ids.has(candidate.a) || !ids.has(candidate.b)) throw new Error(`Road "${candidate.id}" must connect existing nodes`);
     if (candidate.a === candidate.b) throw new Error(`Road "${candidate.id}" must connect two different nodes`);
     if (!isFiniteNumber(candidate.width) || candidate.width <= 0) throw new Error(`Road "${candidate.id}" width must be greater than 0`);
+    if (value.version === 2 && (!isFiniteNumber(candidate.travelTimeMultiplier) || candidate.travelTimeMultiplier < 1)) throw new Error(`Road "${candidate.id}" travelTimeMultiplier must be a number greater than or equal to 1`);
     const key = roadKey(candidate.a, candidate.b);
     if (roadKeys.has(key)) throw new Error(`A road between "${candidate.a}" and "${candidate.b}" already exists`);
     roadIds.add(candidate.id);

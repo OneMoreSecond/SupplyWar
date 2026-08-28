@@ -1,18 +1,24 @@
 {
-  "version": 1,
+  "version": 2,
   "settings": {
     "logicTickSeconds": 0.1,
     "siegeFormula": "exponential-half-life",
     "siegeHalfLifeSeconds": 5000,
     "secondsPerDistanceUnit": 0.0025,
-    "forcePerWidthUnit": 2
+    "forcePerWidthUnit": 2,
+    "rules": {
+      "siegeSupport": "rooted",
+      "computerAI": { "enabled": false, "decisionIntervalSeconds": 1, "reserveForce": 10 },
+      "fogOfWar": { "enabled": false },
+      "interdiction": { "enabled": false, "durationSeconds": 10, "cooldownSeconds": 60 }
+    }
   },
   "nodes": [
     { "id": "player-base", "label": "Your Base", "owner": "player", "force": 30, "production": 1, "kind": "base", "x": 180, "y": 280 },
     { "id": "enemy-base", "label": "Small Enemy Base", "owner": "enemy", "force": 4, "production": 0, "kind": "base", "x": 720, "y": 280 }
   ],
   "roads": [
-    { "id": "direct-road", "a": "player-base", "b": "enemy-base", "width": 2 }
+    { "id": "direct-road", "a": "player-base", "b": "enemy-base", "width": 2, "travelTimeMultiplier": 1 }
   ],
   "initialTransports": []
 }

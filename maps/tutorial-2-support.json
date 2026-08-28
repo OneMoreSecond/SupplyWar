@@ -1,11 +1,17 @@
 {
-  "version": 1,
+  "version": 2,
   "settings": {
     "logicTickSeconds": 0.1,
     "siegeFormula": "exponential-half-life",
     "siegeHalfLifeSeconds": 5000,
     "secondsPerDistanceUnit": 0.005,
-    "forcePerWidthUnit": 2
+    "forcePerWidthUnit": 2,
+    "rules": {
+      "siegeSupport": "rooted",
+      "computerAI": { "enabled": false, "decisionIntervalSeconds": 1, "reserveForce": 10 },
+      "fogOfWar": { "enabled": false },
+      "interdiction": { "enabled": false, "durationSeconds": 10, "cooldownSeconds": 60 }
+    }
   },
   "nodes": [
     { "id": "upper-resource", "label": "Upper Supply", "owner": "player", "force": 25, "production": 3, "kind": "resource", "x": 120, "y": 120 },
@@ -15,10 +21,10 @@
     { "id": "enemy-resource", "label": "Enemy Supply", "owner": "enemy", "force": 45, "production": 2, "kind": "resource", "x": 820, "y": 280 }
   ],
   "roads": [
-    { "id": "upper-supply", "a": "upper-resource", "b": "player-base", "width": 1.5 },
-    { "id": "lower-supply", "a": "lower-resource", "b": "player-base", "width": 1.5 },
-    { "id": "base-attack", "a": "player-base", "b": "enemy-base", "width": 2 },
-    { "id": "enemy-supply", "a": "enemy-resource", "b": "enemy-base", "width": 1 }
+    { "id": "upper-supply", "a": "upper-resource", "b": "player-base", "width": 1.5, "travelTimeMultiplier": 1 },
+    { "id": "lower-supply", "a": "lower-resource", "b": "player-base", "width": 1.5, "travelTimeMultiplier": 1 },
+    { "id": "base-attack", "a": "player-base", "b": "enemy-base", "width": 2, "travelTimeMultiplier": 1 },
+    { "id": "enemy-supply", "a": "enemy-resource", "b": "enemy-base", "width": 1, "travelTimeMultiplier": 1 }
   ],
   "initialTransports": [
     { "source": "enemy-resource", "target": "enemy-base", "owner": "enemy" }

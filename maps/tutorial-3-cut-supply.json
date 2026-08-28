@@ -1,21 +1,27 @@
 {
-  "version": 1,
+  "version": 2,
   "settings": {
     "logicTickSeconds": 0.1,
     "siegeFormula": "exponential-half-life",
     "siegeHalfLifeSeconds": 4,
     "secondsPerDistanceUnit": 0.003,
-    "forcePerWidthUnit": 2
+    "forcePerWidthUnit": 2,
+    "rules": {
+      "siegeSupport": "rooted",
+      "computerAI": { "enabled": false, "decisionIntervalSeconds": 1, "reserveForce": 10 },
+      "fogOfWar": { "enabled": false },
+      "interdiction": { "enabled": false, "durationSeconds": 10, "cooldownSeconds": 60 }
+    }
   },
   "nodes": [
     { "id": "player-base", "label": "Your Base", "owner": "player", "force": 50, "production": 2, "kind": "base", "x": 130, "y": 280 },
-    { "id": "enemy-base", "label": "Supported Base", "owner": "enemy", "force": 35, "production": 0, "kind": "base", "x": 530, "y": 280 },
+    { "id": "enemy-base", "label": "Supported Base", "owner": "enemy", "force": 6, "production": 0, "kind": "base", "x": 530, "y": 280 },
     { "id": "enemy-resource", "label": "Enemy Resource", "owner": "enemy", "force": 18, "production": 1, "kind": "resource", "x": 790, "y": 420 }
   ],
   "roads": [
-    { "id": "resource-approach", "a": "player-base", "b": "enemy-resource", "width": 2 },
-    { "id": "enemy-supply", "a": "enemy-resource", "b": "enemy-base", "width": 1.5 },
-    { "id": "direct-assault", "a": "player-base", "b": "enemy-base", "width": 0.5 }
+    { "id": "resource-approach", "a": "player-base", "b": "enemy-resource", "width": 2, "travelTimeMultiplier": 1 },
+    { "id": "enemy-supply", "a": "enemy-resource", "b": "enemy-base", "width": 1.5, "travelTimeMultiplier": 1 },
+    { "id": "direct-assault", "a": "player-base", "b": "enemy-base", "width": 0.5, "travelTimeMultiplier": 1 }
   ],
   "initialTransports": [
     { "source": "enemy-resource", "target": "enemy-base", "owner": "enemy" }

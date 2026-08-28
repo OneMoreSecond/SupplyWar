@@ -1,8 +1,8 @@
-# Supply War MVP
+# Supply War Prototype
 
-Status: implemented browser prototype.
+Status: MVP implemented; large-map Demo baseline implemented; qualitative Gate C pending.
 
-Source: user-confirmed MVP decisions and implementation evidence in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md), and [the tutorial progression record](../../agents/progress/2026-08-27-tutorial-level-progression.md), summarized here on 2026-08-27. These documents are the current maintained MVP reference; the progress records and their histories retain the decision trail.
+Source: user-confirmed MVP decisions and evidence in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md), [the tutorial progression record](../../agents/progress/2026-08-27-tutorial-level-progression.md), and the approved implementation in [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md), updated 2026-08-28. These category documents hold current truth; progress records and histories retain superseded decisions.
 
 ## Document map
 
@@ -10,10 +10,10 @@ Source: user-confirmed MVP decisions and implementation evidence in [the game pr
 | --- | --- | --- |
 | Rules and objective | [Gameplay](gameplay.md) | Transport, capture, support, siege, victory, and deferred rules |
 | Player-facing flow | [User experience](user-experience.md) | Tutorial progression, level navigation, briefing, controls, map-editor workflow, feedback, and interaction states |
-| Authored scenarios | [Map design](map-design.md) | Four focused tutorials, MVP final-exam topology, values, crossing policy, and intended tactics |
+| Authored scenarios | [Map design](map-design.md) | Four tutorials, revised MVP final exam, large Demo baseline, values, topology, and intended tactics |
 | Implementation | [Technology](tech.md) | Stack, engine boundaries, level catalog, simulation order, camera, data model, editor, and extension points |
 | Evidence and operating checks | [Validation](validation.md) | Automated checks, balance scenarios, game/editor browser checks, and known risk |
 
 ## Scope boundary
 
-The MVP teaches four implemented mechanisms, then tests the combined insight that a weaker player can defeat a stronger enemy by first breaking its supply route. The browser editor supports the complete version-1 map schema, but not arbitrary future schemas, reactive enemy AI, a breakthrough system, a capacity model, campaign persistence/locking, a detailed HUD, or an external runtime plugin platform. Source: [Gameplay](gameplay.md), [Technology](tech.md), and user-confirmed tutorial/map-editor scope.
+The maintained progression teaches four mechanisms, tests them in the MVP final exam, then exposes the 32-node Central Campaign baseline. Version-2 maps add rooted supply, explicit road travel multipliers, and deterministic AI settings; version-1 maps remain loadable with legacy direct-support siege. Fog of war and Interdiction fields are reserved but must remain disabled until their phases are implemented. Human 10–15-minute pacing and fun are not yet validated. Source: [Gameplay](gameplay.md), [Technology](tech.md), [Validation](validation.md), and [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md).

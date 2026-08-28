@@ -1,41 +1,35 @@
-# MVP Map Design
+# Supply War Map Design
 
-Source: authored map data under [`maps/`](../../maps/), user-confirmed tutorial/MVP decisions, the geometry-aware balance model in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), and [the tutorial progress record](../../agents/progress/2026-08-27-tutorial-level-progression.md), summarized on 2026-08-27.
+Status: five teaching/final-exam maps are regression-tested; the 32-node Demo baseline is implemented but awaits qualitative Gate C play.
 
-## Tutorial maps
+Source: authored data under [`maps/`](../../maps/), scripted routes in [`test/levels.test.ts`](../../test/levels.test.ts), and implementation evidence in [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md), updated 2026-08-28.
 
-Each tutorial uses the unchanged version-1 schema and focuses on one new mechanism. Earlier mechanics remain available when the focal lesson depends on them. Source: user tutorial goal and [`src/levels.ts`](../../src/levels.ts).
+## Authored progression
 
-| Map | Focal mechanism | Authored setup | Intended solution |
-| --- | --- | --- | --- |
-| [`tutorial-1-transport.json`](../../maps/tutorial-1-transport.json) | Transport and capture | One favorable direct road; siege half-life `5000s` keeps attrition negligible | Send Your Base directly to the Small Enemy Base |
-| [`tutorial-2-support.json`](../../maps/tutorial-2-support.json) | Allied support | Enemy Supply actively protects Supported Base from siege; Upper Supply and Lower Supply can both reinforce the weak player base | Start both player support routes, then attack Supported Base |
-| [`tutorial-3-cut-supply.json`](../../maps/tutorial-3-cut-supply.json) | Source capture | Enemy Resource sits beyond Supported Base; the narrow direct road fails while its support remains active | Go past the base to capture Enemy Resource, then attack back along its former supply road |
-| [`tutorial-4-siege.json`](../../maps/tutorial-4-siege.json) | Unsupported siege | Three player positions totaling force `12` surround an unsupported force-`90` fortress with a `1.4s` siege half-life | Attack from Main Force, North Flank, and South Flank to form the siege |
+All maintained maps use schema version 2 and rooted supply. Earlier mechanics remain available when a tutorial depends on them. Source: authored JSON and [`src/levels.ts`](../../src/levels.ts).
 
-Source: authored tutorial JSON and scripted solutions in [`test/levels.test.ts`](../../test/levels.test.ts).
+| Order | Map | Focus | Intended interaction | Source |
+| ---: | --- | --- | --- | --- |
+| 1 | [`tutorial-1-transport.json`](../../maps/tutorial-1-transport.json) | Transport | Send Your Base directly to Small Enemy Base | Map JSON and [`test/levels.test.ts`](../../test/levels.test.ts) |
+| 2 | [`tutorial-2-support.json`](../../maps/tutorial-2-support.json) | Allied supply | Feed Your Base from both resources while attacking Supported Base | Map JSON and [`test/levels.test.ts`](../../test/levels.test.ts) |
+| 3 | [`tutorial-3-cut-supply.json`](../../maps/tutorial-3-cut-supply.json) | Source capture | Reject the supported direct route; capture Enemy Resource, then attack back | Map JSON and [`test/levels.test.ts`](../../test/levels.test.ts) |
+| 4 | [`tutorial-4-siege.json`](../../maps/tutorial-4-siege.json) | Rooted siege | Siege the ordinary Unsupported Fortress from three positions, then capture the non-siegeable Enemy Base by packets | Map JSON and [`test/levels.test.ts`](../../test/levels.test.ts) |
+| 5 | [`mvp.json`](../../maps/mvp.json) | Final exam | Capture the resource root, siege the frontline, then packet-capture the base | Map JSON and [`test/levels.test.ts`](../../test/levels.test.ts) |
+| 6 | [`demo.json`](../../maps/demo.json) | Large-map baseline | Expand through rural resources, contest the central network, and defeat active AI | User-approved Demo plan and map JSON |
 
-## Time scale
+## Maintained route timings
 
-All five levels target approximately half their preceding expected completion time through map numbers only. The original adjustment halved `siegeHalfLifeSeconds` and `secondsPerDistanceUnit` while doubling `forcePerWidthUnit` and every non-zero node `production`; the reviewed Tutorials 2–4 then received localized balance changes for their new layouts. Tutorial 3 uses `0.003` seconds per distance unit so placing its resource beyond the base retains short pacing. The fixed `0.1s` logic tick and engine rules are unchanged. Source: user reviews, 2026-08-27; authored JSON and [`src/game.ts`](../../src/game.ts).
+| Level milestone | Simulation time | Source |
+| --- | ---: | --- |
+| Tutorial 1 victory | 2.4s | [`test/levels.test.ts`](../../test/levels.test.ts) |
+| Tutorial 2 victory | 7.2s | [`test/levels.test.ts`](../../test/levels.test.ts) |
+| Tutorial 3 victory | 11.1s | Local scripted measurement in [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md), 2026-08-28 |
+| Tutorial 4 fortress / victory | 7.1s / 12.0s | Local scripted measurement in the Demo progress record, 2026-08-28 |
+| MVP resource / frontline / victory | 10.7s / 36.9s / 71.7s | Local scripted measurement in the Demo progress record, 2026-08-28 |
 
-| Level | Before | After | Ratio |
-| --- | ---: | ---: | ---: |
-| Tutorial 1 — Transport | 4.8s | 2.4s | 50.0% |
-| Tutorial 2 — Support | 14.3s | 7.2s | 50.3% |
-| Tutorial 3 — Cut supply | 21.2s | 11.0s | 51.9% |
-| Tutorial 4 — Siege | 14.5s | 7.1s | 49.0% |
-| MVP final exam | 143.2s | 71.8s | 50.1% |
-
-Source: scripted `Simulation` routes using [`test/levels.test.ts`](../../test/levels.test.ts), measured before and after the review adjustment and recorded in [the tutorial progress record](../../agents/progress/2026-08-27-tutorial-level-progression.md).
+The fixed `0.1s` logic tick remains unchanged. Tutorial 4 gained a separate base and the MVP numbers were rebalanced because rooted bases/resources no longer receive siege decay. Source: [`src/game.ts`](../../src/game.ts), revised map JSON, and [`test/levels.test.ts`](../../test/levels.test.ts).
 
 ## MVP final exam
-
-### Tactical purpose
-
-The map makes the enemy frontline immediately threatening but puts the resource, backup, and base in a distant rear area. The player must use the long flank to remove frontline support before attacking the frontline. Source: user-confirmed map-layout correction.
-
-### Topology
 
 ```text
 Player Base ── Enemy Frontline ───────── Enemy Base
@@ -44,40 +38,33 @@ Player Base ── Enemy Frontline ───────── Enemy Base
        └─────────────────────╯
 ```
 
-The roads are Player Base–Frontline, Frontline–Resource, Resource–Backup, Backup–Enemy Base, Player Base–Resource, and Frontline–Enemy Base. This authored layout avoids crossings for readability, but road crossings are valid game data and may be used by other maps. Source: [`maps/mvp.json`](../../maps/mvp.json) for the layout; user review, 2026-08-27, for the crossing policy.
-
-### Nodes
-
-| Node | Initial owner | Force / production | Position | Map purpose |
-| --- | --- | --- | --- | --- |
-| Player Base | Player | 45 / 1 per second | (85, 300) | Starting force and reinforcement source |
-| Enemy Frontline | Enemy | 70 / 0 | (285, 300) | Nearby strong threat that needs a supply cut |
-| Enemy Resource | Enemy | 38 / 2 per second | (620, 470) | Weak rear source and first tactical capture |
-| Enemy Backup | Enemy | 80 / 0 | (820, 470) | Supplied strong force, deliberately bypassed |
-| Enemy Base | Enemy | 85 / 2 per second | (820, 150) | Final victory target and backup source |
-
-Source: [`maps/mvp.json`](../../maps/mvp.json); purposes: user-confirmed scenario design.
-
-### Roads and initial flows
-
-All roads have width `1`; their latency follows their displayed geometry at `0.0075` seconds per distance unit. Source: [`maps/mvp.json`](../../maps/mvp.json).
-
-| Route | Distance / latency | Initial transport | Tactical implication |
+| Node | Initial force / production | Purpose | Source |
 | --- | --- | --- | --- |
-| Player Base → Frontline | 200.0 / 1.5s | None | Direct attack is tempting but fails while support remains |
-| Player Base → Resource | 561.4 / 4.2s | None | Long flank that starts the intended solution |
-| Resource → Frontline | 375.7 / 2.8s | Enemy support | Capturing the resource cancels this support at its source |
-| Frontline → Enemy Base | 555.6 / 4.2s | None | Final siege route after the frontline falls |
-| Resource → Backup | 200.0 / 1.5s | None | Part of the visible enemy rear network |
-| Enemy Base → Backup | 320.0 / 2.4s | Enemy support | Demonstrates a second static enemy supply flow |
+| Player Base | 45 / 1 | Starting force and flank source | [`maps/mvp.json`](../../maps/mvp.json) |
+| Enemy Frontline | 70 / 0 | Strong ordinary node protected by rooted resource support | [`maps/mvp.json`](../../maps/mvp.json) |
+| Enemy Resource | 25 / 2 | First packet-capture target and frontline supply root | [`maps/mvp.json`](../../maps/mvp.json) |
+| Enemy Backup | 80 / 0 | Strong rear node deliberately bypassed | [`maps/mvp.json`](../../maps/mvp.json) |
+| Enemy Base | 61 / 0.5 | Final root captured by packets, not siege | [`maps/mvp.json`](../../maps/mvp.json) |
 
-Source: geometry from [`maps/mvp.json`](../../maps/mvp.json); transport purpose: user-confirmed map design.
+Player Base–Resource has width `2`; Resource–Frontline has width `1`; Enemy Base–Backup has width `0.25`; the other three roads have width `1`. Every road has `travelTimeMultiplier: 1`. The narrower rear support lets its root retain force while keeping the intended direct frontline attack unsuccessful. Source: [`maps/mvp.json`](../../maps/mvp.json) and regression cases in [`test/game.test.ts`](../../test/game.test.ts).
 
-### Intended solution and balance target
+## Central Campaign baseline
 
-1. Attack and capture Enemy Resource from Player Base.
-2. The resource-to-frontline support transport cancels because its source changed owner.
-3. Attack and siege Enemy Frontline from the captured resource.
-4. Attack and siege Enemy Base from the captured frontline, bypassing Enemy Backup.
+| Property | Current value | Source |
+| --- | --- | --- |
+| Nodes / roads | 32 / 60 | [`maps/demo.json`](../../maps/demo.json) |
+| Resource nodes | 7 | [`maps/demo.json`](../../maps/demo.json) and [`test/levels.test.ts`](../../test/levels.test.ts) |
+| Regions | Player rear, sparse western rural approaches, dense central city, eastern approaches, enemy rear | Authored topology in [`maps/demo.json`](../../maps/demo.json) |
+| Road variety | Widths `0.6`–`2`; travel multipliers `1`–`1.8` | [`maps/demo.json`](../../maps/demo.json) |
+| Long route | North Hamlet–Uptown East bypass: width `0.6`, multiplier `1.8` | [`maps/demo.json`](../../maps/demo.json) |
+| Economy | Production is concentrated in seven resources and two bases; ordinary nodes produce zero | [`maps/demo.json`](../../maps/demo.json) |
+| Opponent | Deterministic AI, one decision per simulation second, reserve force `10` | [`maps/demo.json`](../../maps/demo.json) and [`src/ai.ts`](../../src/ai.ts) |
+| Current information rules | Full visibility; fog and Interdiction disabled | [`maps/demo.json`](../../maps/demo.json) |
 
-The geometry-aware model predicts resource/frontline/base capture at 16.7 / 44.9 / 71.6 simulation seconds; a direct Player Base → Frontline assault leaves the frontline enemy-owned at 240 seconds. Source: [`agents/tmp/2026-08-26-game-demo-plan-grill/script/balance_model.py`](../../agents/tmp/2026-08-26-game-demo-plan-grill/script/balance_model.py) and its recorded results.
+The production browser baseline loaded all six levels and showed enemy expansion from 9 to 13 nodes with 5 active enemy routes at simulation second 18. Source: [`agents/tmp/2026-08-28-demo-plan/script/demo_browser_check.mjs`](../../agents/tmp/2026-08-28-demo-plan/script/demo_browser_check.mjs) and recorded output, 2026-08-28.
+
+## Remaining map risk
+
+- Gate C human play has not yet proved the four intended stages or 10–15-minute pacing. Source: acceptance criteria in [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md).
+- Full-map fit uses about 50.7% zoom. Short labels and semantic shapes are readable in the current screenshot, but human play must confirm animated routes do not obscure tactical information. Source: inspected production screenshot [`demo-baseline.png`](../../agents/tmp/2026-08-28-demo-plan/output/demo-baseline.png), 2026-08-28.
+- Fog and Interdiction must not be enabled until the full-visibility topology/economy loop passes Gate C. Source: approved staged plan in the Demo progress record.

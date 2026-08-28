@@ -1,10 +1,18 @@
 import "./editor.css";
 import defaultMap from "../maps/mvp.json";
 import { Camera2D, type Point2D } from "./camera";
-import { validateMap, type MapConfig, type MapNode, type MapTransport, type NodeKind, type Owner, type Road } from "./game";
+import { validateMap, type MapNode, type MapSettingsV1, type MapTransport, type NodeKind, type Owner, type RuleSettings } from "./game";
 import { playtestFileNameKey, playtestMapKey } from "./playtest";
 
-type Selection = { kind: "node"; node: MapNode } | { kind: "road"; road: Road } | null;
+interface EditableRoad { id: string; a: string; b: string; width: number; travelTimeMultiplier?: number; }
+interface EditableMapConfig {
+  version: number;
+  settings: MapSettingsV1 & { rules?: RuleSettings };
+  nodes: MapNode[];
+  roads: EditableRoad[];
+  initialTransports: MapTransport[];
+}
+type Selection = { kind: "node"; node: MapNode } | { kind: "road"; road: EditableRoad } | null;
 
 const preview = document.querySelector<HTMLCanvasElement>("#map-preview")!;
 const context = preview.getContext("2d")!;
@@ -25,23 +33,23 @@ const ownerOptions: Owner[] = ["player", "enemy", "neutral"];
 const kindOptions: NodeKind[] = ["base", "resource", "ordinary"];
 const ownerColors: Record<Owner, string> = { player: "#42c97a", enemy: "#ed5d62", neutral: "#8d9aa7" };
 
-function initialState(): { draft: MapConfig; fileName: string; restored: boolean; restoreProblem: boolean } {
+function initialState(): { draft: EditableMapConfig; fileName: string; restored: boolean; restoreProblem: boolean } {
   if (new URLSearchParams(window.location.search).has("playtest")) {
     const stored = sessionStorage.getItem(playtestMapKey);
     if (stored) {
       try {
         const parsed: unknown = JSON.parse(stored);
         validateMap(parsed);
-        return { draft: structuredClone(parsed), fileName: sessionStorage.getItem(playtestFileNameKey) ?? "playtest-map.json", restored: true, restoreProblem: false };
+        return { draft: structuredClone(parsed) as EditableMapConfig, fileName: sessionStorage.getItem(playtestFileNameKey) ?? "playtest-map.json", restored: true, restoreProblem: false };
       } catch (error) {
         console.warn("Could not restore the playtest draft because its stored map is invalid; opening the authored MVP map.", error);
       }
     } else {
       console.warn("Could not restore the playtest draft because browser session storage is empty; opening the authored MVP map.");
     }
-    return { draft: structuredClone(defaultMap) as MapConfig, fileName: "mvp.json", restored: false, restoreProblem: true };
+    return { draft: structuredClone(defaultMap) as EditableMapConfig, fileName: "mvp.json", restored: false, restoreProblem: true };
   }
-  return { draft: structuredClone(defaultMap) as MapConfig, fileName: "mvp.json", restored: false, restoreProblem: false };
+  return { draft: structuredClone(defaultMap) as EditableMapConfig, fileName: "mvp.json", restored: false, restoreProblem: false };
 }
 
 const initial = initialState();
@@ -87,6 +95,17 @@ function numberInput(value: number, onInput: (value: number) => void, minimum?: 
   input.value = Number.isFinite(value) ? String(value) : "";
   input.addEventListener("input", () => {
     onInput(input.valueAsNumber);
+    refresh();
+  });
+  return input;
+}
+
+function checkboxInput(value: boolean, onInput: (value: boolean) => void): HTMLInputElement {
+  const input = document.createElement("input");
+  input.type = "checkbox";
+  input.checked = value;
+  input.addEventListener("input", () => {
+    onInput(input.checked);
     refresh();
   });
   return input;
@@ -140,23 +159,53 @@ function nodeReferences(current: string): string[] {
   return current && !ids.includes(current) ? [current, ...ids] : ids;
 }
 
+function setVersion(version: number): void {
+  if (version === 2 && draft.version !== 2) {
+    draft.settings.rules = {
+      siegeSupport: "direct",
+      computerAI: { enabled: false, decisionIntervalSeconds: 1, reserveForce: 10 },
+      fogOfWar: { enabled: false },
+      interdiction: { enabled: false, durationSeconds: 10, cooldownSeconds: 60 },
+    };
+    for (const road of draft.roads) road.travelTimeMultiplier = 1;
+  } else if (version === 1 && draft.version !== 1) {
+    delete draft.settings.rules;
+    for (const road of draft.roads) delete road.travelTimeMultiplier;
+  }
+  draft.version = version;
+}
+
 function renderSettings(): void {
-  settingsFields.replaceChildren(
-    field("Version", numberInput(draft.version, (value) => { draft.version = value; }, 1, "1"), "Supported schema: version 1"),
+  const fields = [
+    field("Version", selectInput(String(draft.version), ["1", "2"], (value) => { setVersion(Number(value)); renderAll(); }), "Supported schemas: version 1 and version 2"),
     field("Siege formula", selectInput(draft.settings.siegeFormula, ["exponential-half-life"], (value) => { draft.settings.siegeFormula = value; })),
     field("Logic tick (seconds)", numberInput(draft.settings.logicTickSeconds, (value) => { draft.settings.logicTickSeconds = value; }, Number.MIN_VALUE)),
     field("Siege half-life (seconds)", numberInput(draft.settings.siegeHalfLifeSeconds, (value) => { draft.settings.siegeHalfLifeSeconds = value; }, Number.MIN_VALUE)),
     field("Seconds per distance unit", numberInput(draft.settings.secondsPerDistanceUnit, (value) => { draft.settings.secondsPerDistanceUnit = value; }, Number.MIN_VALUE)),
     field("Force per width unit", numberInput(draft.settings.forcePerWidthUnit, (value) => { draft.settings.forcePerWidthUnit = value; }, Number.MIN_VALUE)),
-  );
+  ];
+  const rules = draft.settings.rules;
+  if (draft.version === 2 && rules) {
+    fields.push(
+      field("Siege support", selectInput(rules.siegeSupport, ["direct", "rooted"], (value) => { rules.siegeSupport = value; })),
+      field("Computer AI", checkboxInput(rules.computerAI.enabled, (value) => { rules.computerAI.enabled = value; })),
+      field("AI decision interval (seconds)", numberInput(rules.computerAI.decisionIntervalSeconds, (value) => { rules.computerAI.decisionIntervalSeconds = value; }, Number.MIN_VALUE)),
+      field("AI reserve force", numberInput(rules.computerAI.reserveForce, (value) => { rules.computerAI.reserveForce = value; }, 0)),
+      field("Fog of war", checkboxInput(rules.fogOfWar.enabled, (value) => { rules.fogOfWar.enabled = value; })),
+      field("Interdiction", checkboxInput(rules.interdiction.enabled, (value) => { rules.interdiction.enabled = value; })),
+      field("Interdiction duration (seconds)", numberInput(rules.interdiction.durationSeconds, (value) => { rules.interdiction.durationSeconds = value; }, Number.MIN_VALUE)),
+      field("Interdiction cooldown (seconds)", numberInput(rules.interdiction.cooldownSeconds, (value) => { rules.interdiction.cooldownSeconds = value; }, Number.MIN_VALUE)),
+    );
+  }
+  settingsFields.replaceChildren(...fields);
 }
 
-function transportForRoad(road: Road): MapTransport | undefined {
+function transportForRoad(road: EditableRoad): MapTransport | undefined {
   const key = endpointKey(road.a, road.b);
   return draft.initialTransports.find((transport) => endpointKey(transport.source, transport.target) === key);
 }
 
-function updateRoadEndpoint(road: Road, endpoint: "a" | "b", value: string): void {
+function updateRoadEndpoint(road: EditableRoad, endpoint: "a" | "b", value: string): void {
   const previous = road[endpoint];
   const transport = transportForRoad(road);
   road[endpoint] = value;
@@ -165,7 +214,7 @@ function updateRoadEndpoint(road: Road, endpoint: "a" | "b", value: string): voi
   if (transport.target === previous) transport.target = value;
 }
 
-function defaultTransport(road: Road): MapTransport {
+function defaultTransport(road: EditableRoad): MapTransport {
   const aOwner = draft.nodes.find((node) => node.id === road.a)?.owner;
   const bOwner = draft.nodes.find((node) => node.id === road.b)?.owner;
   if (aOwner === "player" || aOwner === "enemy") return { source: road.a, target: road.b, owner: aOwner };
@@ -173,7 +222,7 @@ function defaultTransport(road: Road): MapTransport {
   return { source: road.a, target: road.b, owner: "player" };
 }
 
-function transportEditor(road: Road): HTMLElement {
+function transportEditor(road: EditableRoad): HTMLElement {
   const root = document.createElement("section");
   root.className = "transport-editor";
   const heading = document.createElement("div");
@@ -265,6 +314,9 @@ function renderInspector(): void {
     field("Endpoint A", selectInput(road.a, nodeReferences(road.a), (value) => { updateRoadEndpoint(road, "a", value); })),
     field("Endpoint B", selectInput(road.b, nodeReferences(road.b), (value) => { updateRoadEndpoint(road, "b", value); })),
   );
+  if (draft.version === 2) {
+    item.fields.append(field("Travel time multiplier", numberInput(road.travelTimeMultiplier ?? Number.NaN, (value) => { road.travelTimeMultiplier = value; }, 1)));
+  }
   item.root.append(transportEditor(road));
   selectionFields.append(item.root);
 }
@@ -273,7 +325,7 @@ function endpointKey(a: string, b: string): string {
   return [a, b].sort().join(":");
 }
 
-function roadBetween(a: string, b: string): Road | undefined {
+function roadBetween(a: string, b: string): EditableRoad | undefined {
   const key = endpointKey(a, b);
   return draft.roads.find((road) => endpointKey(road.a, road.b) === key);
 }
@@ -444,7 +496,7 @@ document.querySelector<HTMLButtonElement>("#reset-map")!.addEventListener("click
     setStatus("Reset canceled. Your current map was not changed.", false);
     return;
   }
-  draft = structuredClone(defaultMap) as MapConfig;
+  draft = structuredClone(defaultMap) as EditableMapConfig;
   downloadName = "mvp.json";
   selection = null;
   camera.fit(draft.nodes);
@@ -457,7 +509,7 @@ fileInput.addEventListener("change", async () => {
   try {
     const parsed: unknown = JSON.parse(await file.text());
     validateMap(parsed);
-    draft = structuredClone(parsed);
+    draft = structuredClone(parsed) as EditableMapConfig;
     downloadName = file.name.toLowerCase().endsWith(".json") ? file.name : `${file.name}.json`;
     selection = null;
     camera.fit(draft.nodes);
@@ -530,7 +582,7 @@ function pointLineDistance(point: Point2D, a: Point2D, b: Point2D): number {
   return Math.hypot(point.x - (a.x + dx * t), point.y - (a.y + dy * t));
 }
 
-function roadAt(point: { x: number; y: number }): Road | undefined {
+function roadAt(point: { x: number; y: number }): EditableRoad | undefined {
   for (const road of [...draft.roads].reverse()) {
     const a = draft.nodes.find((node) => node.id === road.a);
     const b = draft.nodes.find((node) => node.id === road.b);
@@ -623,7 +675,13 @@ preview.addEventListener("pointerup", (event) => {
       renderAll("Those nodes are already connected. The existing road is selected.");
       return;
     }
-    const road: Road = { id: nextId("road", draft.roads.map((candidate) => candidate.id)), a: source.id, b: target.id, width: 1 };
+    const road: EditableRoad = {
+      id: nextId("road", draft.roads.map((candidate) => candidate.id)),
+      a: source.id,
+      b: target.id,
+      width: 1,
+      ...(draft.version === 2 ? { travelTimeMultiplier: 1 } : {}),
+    };
     draft.roads.push(road);
     selection = { kind: "road", road };
     renderAll(`Added and selected road ${road.id}.`);

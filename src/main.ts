@@ -1,6 +1,7 @@
 import "./style.css";
+import { applyAICommand, chooseAICommand, createAIObservation } from "./ai";
 import { Camera2D, type Point2D } from "./camera";
-import { Simulation, validateMap, type MapConfig, type NodeState, type Owner, type Transport } from "./game";
+import { Simulation, upgradeMap, validateMap, type MapConfig, type NodeState, type Owner, type RoadV2, type Transport } from "./game";
 import { levelById, levels, nextLevel, type LevelDefinition } from "./levels";
 import { playtestMapKey } from "./playtest";
 
@@ -44,7 +45,7 @@ function pageConfig(): Page {
 }
 
 const page = pageConfig();
-const config = page.config;
+const config = upgradeMap(page.config);
 const successor = page.level ? nextLevel(page.level.id) : undefined;
 const tutorialLevels = levels.filter((level) => level.kind === "tutorial");
 
@@ -60,7 +61,7 @@ if (page.mode === "level") {
   const tutorialNumber = tutorialLevels.findIndex((level) => level.id === page.level.id) + 1;
   document.querySelector<HTMLElement>("#mode-label")!.textContent = page.level.kind === "tutorial"
     ? `SUPPLY WAR · TUTORIAL ${tutorialNumber}/${tutorialLevels.length} · ${page.level.mechanism}`
-    : "SUPPLY WAR · FINAL EXAM";
+    : page.level.kind === "final-exam" ? "SUPPLY WAR · FINAL EXAM" : "SUPPLY WAR · DEMO";
   document.querySelector<HTMLElement>("#mission-title")!.textContent = page.level.title;
   document.querySelector<HTMLElement>("#briefing")!.textContent = page.level.briefing;
   document.querySelector<HTMLElement>("#hint")!.textContent = page.level.hint;
@@ -94,12 +95,14 @@ let lastFrame = performance.now();
 let accumulator = 0;
 let speedMultiplier = 1;
 let completionShown = false;
+let nextAIDecisionAt = config.settings.rules.computerAI.decisionIntervalSeconds;
 const colors: Record<Owner, string> = { player: "#42c97a", enemy: "#ed5d62", neutral: "#8d9aa7" };
 
 function resetLevel(): void {
   game = new Simulation(config);
   accumulator = 0;
   completionShown = false;
+  nextAIDecisionAt = config.settings.rules.computerAI.decisionIntervalSeconds;
   completionDialog.close();
 }
 
@@ -111,7 +114,9 @@ function showLevelCompletion(): void {
     completionMessage.textContent = `Congratulations. Next: ${successor.pickerLabel}.`;
     nextLevelButton.textContent = "Next level";
   } else {
-    completionMessage.textContent = "Congratulations. You cleared the Supply War campaign.";
+    completionMessage.textContent = page.level.kind === "demo"
+      ? "Congratulations. You won the Central Campaign."
+      : "Congratulations. You cleared the Supply War campaign.";
     nextLevelButton.textContent = "Close";
   }
   completionDialog.showModal();
@@ -170,16 +175,39 @@ function drawDirectionTriangle(a: Point2D, b: Point2D, t: number, color: string)
   context.restore();
 }
 
-function drawRoad(transport: Transport | undefined, a: NodeState, b: NodeState): void {
+function drawRoad(road: RoadV2, transport: Transport | undefined, a: NodeState, b: NodeState): void {
   const screenA = camera.worldToScreen(a);
   const screenB = camera.worldToScreen(b);
-  context.lineWidth = transport ? 9 : 5;
+  context.lineWidth = transport ? Math.max(6, road.width * 5) : 2 + road.width * 2;
   context.strokeStyle = transport ? colors[transport.owner] : "#536475";
   context.globalAlpha = transport ? 0.82 : 0.8;
+  context.setLineDash(road.travelTimeMultiplier > 1 ? [10, 4 + road.travelTimeMultiplier * 3] : []);
   context.beginPath(); context.moveTo(screenA.x, screenA.y); context.lineTo(screenB.x, screenB.y); context.stroke(); context.globalAlpha = 1;
+  context.setLineDash([]);
   if (!transport) return;
   const phase = game.time % 1;
   for (let i = 0; i < 3; i++) drawDirectionTriangle(screenA, screenB, 0.14 + ((phase + i / 3) % 1) * 0.72, "#f7fbff");
+}
+
+function drawNodeShape(node: NodeState, x: number, y: number, radius: number): void {
+  context.beginPath();
+  if (node.kind === "base") {
+    for (let index = 0; index < 10; index++) {
+      const angle = -Math.PI / 2 + index * Math.PI / 5;
+      const distance = index % 2 === 0 ? radius : radius * 0.48;
+      const pointX = x + Math.cos(angle) * distance;
+      const pointY = y + Math.sin(angle) * distance;
+      if (index === 0) context.moveTo(pointX, pointY); else context.lineTo(pointX, pointY);
+    }
+    context.closePath();
+    return;
+  }
+  if (node.kind === "resource") {
+    const half = radius * 0.78;
+    context.rect(x - half, y - half, half * 2, half * 2);
+    return;
+  }
+  context.arc(x, y, radius, 0, Math.PI * 2);
 }
 
 function drawDragPreview(): void {
@@ -224,8 +252,7 @@ function drawNode(node: NodeState): void {
     context.stroke();
   }
   context.fillStyle = colors[node.owner];
-  context.beginPath();
-  context.arc(screen.x, screen.y, 31, 0, Math.PI * 2);
+  drawNodeShape(node, screen.x, screen.y, 31);
   context.fill();
   context.strokeStyle = node.kind === "base" ? "#fff" : node.kind === "resource" ? "#f0bd4f" : "#1a2530";
   context.lineWidth = node.kind === "ordinary" ? 2 : 5;
@@ -235,12 +262,12 @@ function drawNode(node: NodeState): void {
   context.textAlign = "center";
   context.fillText(String(Math.round(node.force)), screen.x, screen.y + 6);
   context.fillStyle = "#dbe7ef";
-  context.font = "600 12px system-ui";
-  context.fillText(node.label, screen.x, screen.y + 53);
+  context.font = "600 11px system-ui";
+  context.fillText(node.label, screen.x, screen.y + (node.kind === "ordinary" ? 51 : 62));
   if (node.kind !== "ordinary") {
     context.fillStyle = "#f0bd4f";
     context.font = "700 11px system-ui";
-    context.fillText(node.kind.toUpperCase(), screen.x, screen.y - 43);
+    context.fillText(node.kind === "resource" ? `+${node.production}/s` : "BASE", screen.x, screen.y - 43);
   }
 }
 
@@ -250,7 +277,7 @@ function render(): void {
   context.fillRect(0, 0, canvas.width, canvas.height);
   for (const road of game.roads.values()) {
     const active = game.activeOnRoad(road.id);
-    drawRoad(active, active ? game.node(active.source) : game.node(road.a), active ? game.node(active.target) : game.node(road.b));
+    drawRoad(road, active, active ? game.node(active.source) : game.node(road.a), active ? game.node(active.target) : game.node(road.b));
   }
   drawDragPreview();
   for (const node of game.nodes.values()) drawNode(node);
@@ -264,11 +291,18 @@ function render(): void {
   canvas.dataset.cameraX = camera.centerX.toFixed(2);
   canvas.dataset.cameraY = camera.centerY.toFixed(2);
   canvas.dataset.cameraZoom = camera.zoom.toFixed(4);
+  canvas.dataset.playerNodes = String([...game.nodes.values()].filter((node) => node.owner === "player").length);
+  canvas.dataset.enemyNodes = String([...game.nodes.values()].filter((node) => node.owner === "enemy").length);
+  canvas.dataset.activeEnemyTransports = String(game.transports.filter((transport) => transport.active && transport.owner === "enemy").length);
   const target = dragPoint ? nodeAt(dragPoint) : undefined;
   if (game.winner === "player" && successor && page.level) {
     status.textContent = `Victory — ${page.level.pickerLabel} complete. Continue to ${successor.pickerLabel}.`;
+  } else if (game.winner === "player" && page.level?.kind === "demo") {
+    status.textContent = "Demo complete — the Central Campaign is won.";
   } else if (game.winner === "player" && page.level?.kind === "final-exam") {
     status.textContent = "Final exam complete — campaign cleared.";
+  } else if (game.winner === "enemy") {
+    status.textContent = "Defeat — Eastern Command captured your base.";
   } else if (game.winner === "player") {
     status.textContent = "Victory — the enemy base surrendered.";
   } else if (dragSource && canStartPlayerTransport(dragSource, target)) {
@@ -286,6 +320,10 @@ function frame(now: number): void {
   lastFrame = now;
   while (accumulator >= config.settings.logicTickSeconds) {
     game.step();
+    if (config.settings.rules.computerAI.enabled && !game.winner && game.time >= nextAIDecisionAt) {
+      applyAICommand(game, chooseAICommand(createAIObservation(game, "enemy")), "enemy");
+      nextAIDecisionAt += config.settings.rules.computerAI.decisionIntervalSeconds;
+    }
     accumulator -= config.settings.logicTickSeconds;
   }
   render();

@@ -1,59 +1,59 @@
-# MVP Technology
+# Supply War Technology
 
-Source: user-confirmed implementation choices and repository implementation summarized in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), Sections 4–6, [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md), and [the tutorial progress record](../../agents/progress/2026-08-27-tutorial-level-progression.md), on 2026-08-27.
+Status: schema version 2, rooted supply, deterministic AI, and the large-map baseline are implemented. Fog, Interdiction, and the planned game-view extraction are pending.
+
+Source: current repository implementation and [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md), updated 2026-08-28.
 
 ## Architecture
 
-| Component | Responsibility | Primary location |
-| --- | --- | --- |
-| Game shell | Level picker, guidance, completion dialog, map-editor entry, canvas, and restart control | [`index.html`](../../index.html) |
-| View and input | Level routing, Canvas rendering, victory/dialog state, visual feedback, drag/right-click commands, and independent render cadence | [`src/main.ts`](../../src/main.ts) |
-| Level catalog | Ordered tutorial/final-exam metadata and authored map configs | [`src/levels.ts`](../../src/levels.ts) |
-| Camera | Shared world/screen conversion, panning, pointer-anchored zoom, and fit-to-map | [`src/camera.ts`](../../src/camera.ts) |
-| Simulation | Deterministic ownership, production, transports, packets, capture, siege, and victory | [`src/game.ts`](../../src/game.ts) |
-| Map data | Versioned nodes, roads, settings, and initial transports for five authored levels | [`maps/`](../../maps/) |
-| Editor shell | File actions, selectable preview, object inspector, complete version-1 map form, and editor module entry | [`editor.html`](../../editor.html) |
-| Editor behavior | Draft editing, object selection, node/road gestures, validation feedback, JSON load/download, reset confirmation, and playtest transfer | [`src/editor.ts`](../../src/editor.ts) |
-| Playtest transfer | Browser-local keys shared by the editor and game entries | [`src/playtest.ts`](../../src/playtest.ts) |
-| Tests | Simulation mechanics, scenarios, external map validation, camera transforms, tutorial focus, and catalog navigation | [`test/game.test.ts`](../../test/game.test.ts), [`test/camera.test.ts`](../../test/camera.test.ts), [`test/levels.test.ts`](../../test/levels.test.ts) |
+| Component | Responsibility | Primary location | Source |
+| --- | --- | --- | --- |
+| Game shell | Level picker, guidance, completion dialog, editor entry, canvas, and restart | [`index.html`](../../index.html) | Current HTML |
+| Orchestration/view | Level routing, fixed-step accumulation, AI cadence, Canvas drawing, input, and completion state | [`src/main.ts`](../../src/main.ts) | Current implementation |
+| Simulation | Validation/upgrade boundary, force, transports, rooted supply, siege, and victory | [`src/game.ts`](../../src/game.ts) | Current implementation |
+| AI policy | Immutable observation, deterministic command choice, and normal command application | [`src/ai.ts`](../../src/ai.ts) | Current implementation |
+| Level catalog | Four tutorials, MVP final exam, and Demo metadata/configs | [`src/levels.ts`](../../src/levels.ts) | Current implementation |
+| Camera | Shared world/screen transforms, pan, zoom, and fit | [`src/camera.ts`](../../src/camera.ts) | Current implementation |
+| Map data | Six authored version-2 scenarios | [`maps/`](../../maps/) | Current JSON |
+| Editor | Version-1/version-2 forms, direct canvas editing, validation, save, and playtest | [`editor.html`](../../editor.html), [`src/editor.ts`](../../src/editor.ts) | Current implementation |
+| Tests | Simulation/schema, AI, camera, authored scenarios, and catalog | [`test/`](../../test/) | Current suite |
 
 ## Runtime model
 
-The browser stack is vanilla TypeScript, Vite, and Canvas 2D. The simulation advances in fixed 0.1-second steps (10 Hz); `requestAnimationFrame` renders independently. During editor playtests, a 1×–8× multiplier scales elapsed time accumulated into those same fixed steps. Source: user-confirmed stack/tick and playtest-speed decisions; implementation: [`src/main.ts`](../../src/main.ts).
+The browser stack is vanilla TypeScript, Vite, and Canvas 2D. Simulation advances in fixed configured steps—`0.1s` in maintained maps—while `requestAnimationFrame` renders independently. Editor playtests may multiply accumulated elapsed time from 1× to 8× without changing the fixed step. Source: [`src/main.ts`](../../src/main.ts), maintained map JSON, and project constraint in [`AGENTS.md`](../../AGENTS.md).
 
-For each simulation step, the engine produces force, delivers due packets, cancels transports that lost their sources, applies siege, repeats source-loss cancellation, dispatches new packets, and checks base ownership for victory. Source: [`src/game.ts`](../../src/game.ts).
+Each step produces force, delivers due packets, cancels transports whose sources changed owner, applies siege, repeats source-loss cancellation, dispatches new packets, and checks base ownership. On AI-enabled maps, browser orchestration asks for at most one enemy command at each configured decision time after the simulation step. Source: [`src/game.ts`](../../src/game.ts), [`src/main.ts`](../../src/main.ts), and [`src/ai.ts`](../../src/ai.ts).
 
-## Configuration boundary
+## Versioned map boundary
 
-`MapConfig` defines versioned map data. One strict validator checks every version-1 scalar field, node IDs and required victory nodes, road IDs/endpoints/topology uniqueness, and usable initial transports at simulation startup and editor import/save time. Road crossings are allowed. The JSON map owns forces, production, unbounded world coordinates, road widths, initial flows, timing values, and the selected siege-formula identifier. Source: [`src/game.ts`](../../src/game.ts), [`maps/mvp.json`](../../maps/mvp.json), and user review, 2026-08-27.
+| Version | Rules | Roads | Current use | Source |
+| --- | --- | --- | --- | --- |
+| 1 | Legacy direct-target support blocks siege | `id`, endpoints, width | Imported old maps | [`src/game.ts`](../../src/game.ts) |
+| 2 | Explicit `rules`, including `siegeSupport`, AI, fog, and Interdiction settings | Version-1 fields plus required `travelTimeMultiplier >= 1` | All six maintained maps | [`src/game.ts`](../../src/game.ts), authored JSON |
 
-This shared boundary lets the browser editor change map content without coupling it to the simulation engine. Source: project constraint in [`AGENTS.md`](../../AGENTS.md); implementation in [`src/editor.ts`](../../src/editor.ts).
+`validateMap` strictly validates either external version. `upgradeMap` clones version 2 unchanged or explicitly upgrades version 1 with `travelTimeMultiplier: 1`, disabled feature rules, and `siegeSupport: "direct"`. `Simulation` consumes only the normalized version-2 runtime type. This preserves old behavior without scattering optional defaults through the engine. Source: [`src/game.ts`](../../src/game.ts) and versioning tests in [`test/game.test.ts`](../../test/game.test.ts).
 
-## Authored level flow
+Version-2 fog and Interdiction configuration is present so authored data has a stable future seam, but validation currently rejects `enabled: true`; no valid map can silently request unimplemented behavior. Source: [`src/game.ts`](../../src/game.ts) and [`test/game.test.ts`](../../test/game.test.ts).
 
-`src/levels.ts` is an ordered catalog of four tutorials followed by `maps/mvp.json`. It owns player-facing level names and guidance without extending `MapConfig`. Normal entry resolves `?level=<id>` and defaults unknown or missing IDs to Tutorial 1. The picker changes that query. An authored player victory opens one native completion dialog: tutorials offer replay and the catalog successor, while the final exam offers replay and close. Source: user goal and review; implementation: [`src/levels.ts`](../../src/levels.ts), [`src/main.ts`](../../src/main.ts), and [`index.html`](../../index.html).
+## Rooted supply algorithm
 
-Editor `?playtest=1` remains a separate, higher-priority route: it hides authored-level controls and runs the validated `sessionStorage` draft. Missing or invalid draft storage retains the existing MVP fallback. Source: existing playtest contract and [`src/main.ts`](../../src/main.ts).
+For each player/enemy owner, the simulation starts reachability at owned base/resource nodes and repeatedly follows active same-owner transports currently in support mode. Siege checks the attacked node against that reachable set. The bounded graph traversal handles branches and cycles without a separate supply object model. Source: [`src/game.ts`](../../src/game.ts); root, multi-hop, isolated-cycle, rooted-cycle, and root-capture tests in [`test/game.test.ts`](../../test/game.test.ts).
 
-## Browser map editor
+## AI boundary
 
-Vite builds `index.html` and `editor.html` as separate browser entries. The game links to the editor with a relative URL so both pages work under the GitHub Pages project path. Source: [`vite.config.ts`](../../vite.config.ts), [`index.html`](../../index.html), [`editor.html`](../../editor.html).
+`createAIObservation` copies only tactical node, road, transport, supply, threat, and reserve facts. `chooseAICommand` is pure and returns start, cancel, or wait; `applyAICommand` uses the same `Simulation` methods as player input. Stable ID ordering resolves equal choices. Source: [`src/ai.ts`](../../src/ai.ts) and [`test/ai.test.ts`](../../test/ai.test.ts).
 
-The editor starts from the authored MVP map and exposes `version`, every settings value, every node/road/initial-transport field, and collection add/remove controls. Global settings stay visible; node properties appear only for the selected node, while a road's optional one initial transport appears inside that road's inspector. Node-body dragging changes world coordinates, dragging a node's square connector creates a road, empty-space dragging pans, wheel input zooms at the pointer, and `Fit map` frames all nodes. Source: [`src/editor.ts`](../../src/editor.ts), user requirements in [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md).
+The implementation intentionally has no behavior tree, path planner, direct force mutation, event bus, difficulty system, or randomness. Source: approved simplicity decision in [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md).
 
-Import validates parsed JSON before replacing the current draft; download and playtest remain unavailable until the draft validates. Playtest serializes the valid draft and filename to `sessionStorage`, opens the game with `?playtest=1`, and returns through `editor.html?playtest=1`, where the same draft is restored. The authored `maps/mvp.json` is unchanged. Reset uses a confirmation dialog before replacing unsaved state. Source: [`src/editor.ts`](../../src/editor.ts), [`src/main.ts`](../../src/main.ts), [`src/playtest.ts`](../../src/playtest.ts), and user review comments in [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md).
+## Browser editor
 
-Both editor and game use `Camera2D`, so simulation distances remain in authored world units while rendering and pointer input share one reversible transform. Nodes and roads keep screen-readable marker widths at any zoom. Source: [`src/camera.ts`](../../src/camera.ts), [`src/editor.ts`](../../src/editor.ts), and [`src/main.ts`](../../src/main.ts).
+The editor loads both versions, keeps partially invalid form state in an explicit editable type, and uses the shared validator before save/playtest. Changing version 1→2 adds explicit legacy-compatible rules and multiplier `1`; changing 2→1 removes version-2 fields. Version-2 settings and per-road travel multiplier are editable. Source: [`src/editor.ts`](../../src/editor.ts) and [`editor.html`](../../editor.html).
 
-## Narrow extension point
+The existing selection, connector-drag roads, node movement, unbounded camera, JSON load/save, reset confirmation, session-storage playtest round trip, and 1×–8× playtest speed remain. Source: [`src/editor.ts`](../../src/editor.ts), [`src/playtest.ts`](../../src/playtest.ts), and [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md).
 
-`SiegeFormula` is the internal plugin interface. The map selects `exponential-half-life`; its half-life is configurable. This is deliberately a narrow formula boundary, not a runtime mod platform. Source: user-confirmed scope and [`src/game.ts`](../../src/game.ts).
+## Deferred technical work
 
-## Local operation
-
-Requires Node 22+ and npm. Source: [`package.json`](../../package.json), [`README.md`](../../README.md).
-
-```bash
-npm install
-npm run dev
-```
+- Gate C human play, including confirmation that animated routes remain legible, before hiding information. Source: refreshed production screenshot and Demo plan.
+- `src/visibility.ts`, fog-aware drawing/hit testing, and discovered-state memory. Source: pending Phase D in the Demo progress record.
+- Simulation-owned Interdiction timers/cooldowns and player/AI commands. Source: pending Phase D in the Demo progress record.
+- Cohesive game-view extraction, node shapes, road styles, HUD, and bundled font. Source: pending Phase E in the Demo progress record.

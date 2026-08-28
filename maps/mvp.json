@@ -1,15 +1,32 @@
 {
-  "version": 1,
-  "settings": { "logicTickSeconds": 0.1, "siegeFormula": "exponential-half-life", "siegeHalfLifeSeconds": 17.5, "secondsPerDistanceUnit": 0.0075, "forcePerWidthUnit": 2 },
+  "version": 2,
+  "settings": {
+    "logicTickSeconds": 0.1,
+    "siegeFormula": "exponential-half-life",
+    "siegeHalfLifeSeconds": 17.5,
+    "secondsPerDistanceUnit": 0.0075,
+    "forcePerWidthUnit": 2,
+    "rules": {
+      "siegeSupport": "rooted",
+      "computerAI": { "enabled": false, "decisionIntervalSeconds": 1, "reserveForce": 10 },
+      "fogOfWar": { "enabled": false },
+      "interdiction": { "enabled": false, "durationSeconds": 10, "cooldownSeconds": 60 }
+    }
+  },
   "nodes": [
     { "id": "player-base", "label": "Player Base", "owner": "player", "force": 45, "production": 1, "kind": "base", "x": 85, "y": 300 },
     { "id": "frontline", "label": "Enemy Frontline", "owner": "enemy", "force": 70, "production": 0, "kind": "ordinary", "x": 285, "y": 300 },
-    { "id": "resource", "label": "Enemy Resource", "owner": "enemy", "force": 38, "production": 2, "kind": "resource", "x": 620, "y": 470 },
+    { "id": "resource", "label": "Enemy Resource", "owner": "enemy", "force": 25, "production": 2, "kind": "resource", "x": 620, "y": 470 },
     { "id": "backup", "label": "Enemy Backup", "owner": "enemy", "force": 80, "production": 0, "kind": "ordinary", "x": 820, "y": 470 },
-    { "id": "enemy-base", "label": "Enemy Base", "owner": "enemy", "force": 85, "production": 2, "kind": "base", "x": 820, "y": 150 }
+    { "id": "enemy-base", "label": "Enemy Base", "owner": "enemy", "force": 61, "production": 0.5, "kind": "base", "x": 820, "y": 150 }
   ],
   "roads": [
-    { "id": "player-frontline", "a": "player-base", "b": "frontline", "width": 1 }, { "id": "frontline-resource", "a": "frontline", "b": "resource", "width": 1 }, { "id": "resource-backup", "a": "resource", "b": "backup", "width": 1 }, { "id": "backup-base", "a": "backup", "b": "enemy-base", "width": 1 }, { "id": "player-resource", "a": "player-base", "b": "resource", "width": 1 }, { "id": "frontline-base", "a": "frontline", "b": "enemy-base", "width": 1 }
+    { "id": "player-frontline", "a": "player-base", "b": "frontline", "width": 1, "travelTimeMultiplier": 1 },
+    { "id": "frontline-resource", "a": "frontline", "b": "resource", "width": 1, "travelTimeMultiplier": 1 },
+    { "id": "resource-backup", "a": "resource", "b": "backup", "width": 1, "travelTimeMultiplier": 1 },
+    { "id": "backup-base", "a": "backup", "b": "enemy-base", "width": 0.25, "travelTimeMultiplier": 1 },
+    { "id": "player-resource", "a": "player-base", "b": "resource", "width": 2, "travelTimeMultiplier": 1 },
+    { "id": "frontline-base", "a": "frontline", "b": "enemy-base", "width": 1, "travelTimeMultiplier": 1 }
   ],
   "initialTransports": [ { "source": "resource", "target": "frontline", "owner": "enemy" }, { "source": "enemy-base", "target": "backup", "owner": "enemy" } ]
 }

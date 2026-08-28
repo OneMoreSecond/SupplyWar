@@ -1,4 +1,5 @@
 import mvp from "../maps/mvp.json";
+import demo from "../maps/demo.json";
 import transport from "../maps/tutorial-1-transport.json";
 import support from "../maps/tutorial-2-support.json";
 import cutSupply from "../maps/tutorial-3-cut-supply.json";
@@ -7,7 +8,7 @@ import type { MapConfig } from "./game";
 
 export interface LevelDefinition {
   id: string;
-  kind: "tutorial" | "final-exam";
+  kind: "tutorial" | "final-exam" | "demo";
   pickerLabel: string;
   mechanism: string;
   title: string;
@@ -66,6 +67,16 @@ export const levels: readonly LevelDefinition[] = [
     briefing: "The enemy's strong frontline threatens our base. But their supply line is vulnerable—break it.",
     hint: "Capture the enemy resource, then attack the unsupported frontline.",
     config: mvp as MapConfig,
+  },
+  {
+    id: "demo",
+    kind: "demo",
+    pickerLabel: "Demo — The Central Campaign",
+    mechanism: "LARGE-MAP COMMAND",
+    title: "Win the battle for the central arsenal.",
+    briefing: "Expand through sparse rural supply, contest the dense central network, then break the enemy's rooted support chain.",
+    hint: "Secure nearby resources before the enemy reaches the center. The long northern road can bypass a stalled front, but it is slow.",
+    config: demo as MapConfig,
   },
 ];
 

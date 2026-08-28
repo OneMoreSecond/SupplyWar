@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { applyAICommand, chooseAICommand, createAIObservation } from "../src/ai";
 import { Simulation, validateMap } from "../src/game";
 import { levels, levelById, nextLevel } from "../src/levels";
 
@@ -8,16 +9,18 @@ function runUntil(game: Simulation, predicate: () => boolean, seconds: number): 
 }
 
 describe("authored level catalog", () => {
-  it("orders four focused tutorials before the MVP final exam", () => {
+  it("orders four focused tutorials, the MVP final exam, and the large-map demo", () => {
     expect(levels.map((level) => level.id)).toEqual([
       "transport",
       "support",
       "cut-supply",
       "siege",
       "mvp",
+      "demo",
     ]);
-    expect(levels.slice(0, -1).every((level) => level.kind === "tutorial")).toBe(true);
-    expect(levels.at(-1)?.kind).toBe("final-exam");
+    expect(levels.slice(0, 4).every((level) => level.kind === "tutorial")).toBe(true);
+    expect(levelById("mvp").kind).toBe("final-exam");
+    expect(levels.at(-1)?.kind).toBe("demo");
   });
 
   it("validates every authored level and resolves navigation safely", () => {
@@ -25,7 +28,8 @@ describe("authored level catalog", () => {
     expect(levelById("support").id).toBe("support");
     expect(levelById("missing").id).toBe("transport");
     expect(nextLevel("transport")?.id).toBe("support");
-    expect(nextLevel("mvp")).toBeUndefined();
+    expect(nextLevel("mvp")?.id).toBe("demo");
+    expect(nextLevel("demo")).toBeUndefined();
   });
 
   it("teaches direct force transport before siege matters", () => {
@@ -78,7 +82,7 @@ describe("authored level catalog", () => {
     expect(directAttack.startTransport("player-base", "enemy-base", "player")).not.toBeNull();
     runUntil(directAttack, () => directAttack.winner === "player", 30);
     expect(directAttack.winner).toBeNull();
-    expect(directAttack.node("enemy-base").force).toBeGreaterThanOrEqual(35);
+    expect(directAttack.node("enemy-base").force).toBeGreaterThanOrEqual(6);
 
     const game = new Simulation(level.config);
     const enemySupport = game.transports[0]!;
@@ -100,18 +104,21 @@ describe("authored level catalog", () => {
     const game = new Simulation(level.config);
     const sideNodes = [game.node("north-flank"), game.node("south-flank")];
     expect(sideNodes.every((node) => node.owner === "player")).toBe(true);
-    expect(sideNodes.every((node) => game.roadBetween(node.id, "enemy-base"))).toBe(true);
+    expect(sideNodes.every((node) => game.roadBetween(node.id, "fortress"))).toBe(true);
     const playerForce = [game.node("player-base"), ...sideNodes]
       .reduce((total, node) => total + node.force, 0);
-    expect(playerForce).toBeLessThan(game.node("enemy-base").force / 5);
-    expect(game.startTransport("player-base", "enemy-base", "player")).not.toBeNull();
-    expect(game.startTransport("north-flank", "enemy-base", "player")).not.toBeNull();
-    expect(game.startTransport("south-flank", "enemy-base", "player")).not.toBeNull();
+    expect(playerForce).toBeLessThan(game.node("fortress").force / 5);
+    expect(game.startTransport("player-base", "fortress", "player")).not.toBeNull();
+    expect(game.startTransport("north-flank", "fortress", "player")).not.toBeNull();
+    expect(game.startTransport("south-flank", "fortress", "player")).not.toBeNull();
+    runUntil(game, () => game.node("fortress").owner === "player", 60);
+    expect(game.node("fortress").owner).toBe("player");
+    expect(game.startTransport("fortress", "enemy-base", "player")).not.toBeNull();
     runUntil(game, () => game.winner === "player", 60);
 
     expect(game.winner).toBe("player");
-    expect(game.time).toBeGreaterThan(6.9);
-    expect(game.time).toBeLessThan(7.3);
+    expect(game.time).toBeGreaterThan(8);
+    expect(game.time).toBeLessThan(12);
   });
 
   it("halves the MVP final-exam completion time through map numbers", () => {
@@ -134,5 +141,35 @@ describe("authored level catalog", () => {
     expect(game.winner).toBe("player");
     expect(game.time).toBeGreaterThan(70);
     expect(game.time).toBeLessThan(72.5);
+  });
+
+  it("provides a varied large-map baseline that the AI expands into", () => {
+    const level = levelById("demo");
+    const config = level.config;
+    if (config.version !== 2) throw new Error("The Demo must use map schema version 2");
+    expect(config.nodes.length).toBeGreaterThanOrEqual(30);
+    expect(config.nodes.length).toBeLessThanOrEqual(40);
+    expect(config.roads.length).toBeGreaterThanOrEqual(45);
+    expect(config.roads.length).toBeLessThanOrEqual(60);
+    expect(config.nodes.filter((node) => node.kind === "resource")).toHaveLength(7);
+    expect(new Set(config.roads.map((road) => road.width)).size).toBeGreaterThanOrEqual(4);
+    expect(config.roads.some((road) => road.travelTimeMultiplier > 1)).toBe(true);
+    expect(config.nodes.filter((node) => node.kind === "ordinary").every((node) => node.production === 0)).toBe(true);
+    expect(config.settings.rules.computerAI.enabled).toBe(true);
+    expect(config.settings.rules.fogOfWar.enabled).toBe(false);
+    expect(config.settings.rules.interdiction.enabled).toBe(false);
+
+    const game = new Simulation(config);
+    const initialEnemyNodes = [...game.nodes.values()].filter((node) => node.owner === "enemy").length;
+    let nextDecisionAt = config.settings.rules.computerAI.decisionIntervalSeconds;
+    for (let index = 0; index < 1200 && !game.winner; index++) {
+      game.step();
+      if (game.time >= nextDecisionAt) {
+        applyAICommand(game, chooseAICommand(createAIObservation(game, "enemy")), "enemy");
+        nextDecisionAt += config.settings.rules.computerAI.decisionIntervalSeconds;
+      }
+    }
+
+    expect([...game.nodes.values()].filter((node) => node.owner === "enemy").length).toBeGreaterThan(initialEnemyNodes);
   });
 });

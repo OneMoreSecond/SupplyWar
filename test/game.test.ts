@@ -1,9 +1,49 @@
 import { describe, expect, it } from "vitest";
 import mapConfig from "../maps/mvp.json";
-import { Simulation, validateMap, type MapConfig } from "../src/game";
+import { Simulation, upgradeMap, validateMap, type MapConfig, type MapConfigV1, type MapConfigV2 } from "../src/game";
 
 const config = mapConfig as MapConfig;
 const runFor = (game: Simulation, seconds: number) => { for (let i = 0; i < Math.round(seconds / config.settings.logicTickSeconds); i++) game.step(); };
+
+function rootedConfig(): MapConfigV2 {
+  return {
+    version: 2,
+    settings: {
+      logicTickSeconds: 0.1,
+      siegeFormula: "exponential-half-life",
+      siegeHalfLifeSeconds: 10,
+      secondsPerDistanceUnit: 0.01,
+      forcePerWidthUnit: 1,
+      rules: {
+        siegeSupport: "rooted",
+        computerAI: { enabled: false, decisionIntervalSeconds: 1, reserveForce: 10 },
+        fogOfWar: { enabled: false },
+        interdiction: { enabled: false, durationSeconds: 10, cooldownSeconds: 60 },
+      },
+    },
+    nodes: [
+      { id: "player-base", label: "Player Base", owner: "player", force: 0, production: 0, kind: "base", x: 0, y: 0 },
+      { id: "enemy-base", label: "Enemy Base", owner: "enemy", force: 100, production: 0, kind: "base", x: 500, y: 0 },
+      { id: "enemy-resource", label: "Enemy Resource", owner: "enemy", force: 0, production: 0, kind: "resource", x: 400, y: 100 },
+      { id: "frontline", label: "Frontline", owner: "enemy", force: 100, production: 0, kind: "ordinary", x: 200, y: 0 },
+      { id: "cycle-a", label: "Cycle A", owner: "enemy", force: 0, production: 0, kind: "ordinary", x: 100, y: 200 },
+      { id: "cycle-b", label: "Cycle B", owner: "enemy", force: 0, production: 0, kind: "ordinary", x: 200, y: 200 },
+      { id: "cycle-c", label: "Cycle C", owner: "enemy", force: 0, production: 0, kind: "ordinary", x: 150, y: 300 },
+    ],
+    roads: [
+      { id: "attack-frontline", a: "player-base", b: "frontline", width: 1, travelTimeMultiplier: 1 },
+      { id: "root-frontline", a: "enemy-resource", b: "frontline", width: 1, travelTimeMultiplier: 1 },
+      { id: "attack-cycle", a: "player-base", b: "cycle-a", width: 1, travelTimeMultiplier: 1 },
+      { id: "cycle-a-b", a: "cycle-a", b: "cycle-b", width: 1, travelTimeMultiplier: 1 },
+      { id: "cycle-b-c", a: "cycle-b", b: "cycle-c", width: 1, travelTimeMultiplier: 1 },
+      { id: "cycle-c-a", a: "cycle-c", b: "cycle-a", width: 1, travelTimeMultiplier: 1 },
+      { id: "root-cycle", a: "enemy-resource", b: "cycle-b", width: 1, travelTimeMultiplier: 1 },
+      { id: "attack-base", a: "player-base", b: "enemy-base", width: 1, travelTimeMultiplier: 1 },
+      { id: "attack-resource", a: "player-base", b: "enemy-resource", width: 1, travelTimeMultiplier: 1 },
+    ],
+    initialTransports: [],
+  };
+}
 
 describe("Supply War simulation", () => {
   it("derives each road timing and throughput from its geometry and width", () => {
@@ -15,7 +55,7 @@ describe("Supply War simulation", () => {
     expect(game.roadLength(flankRoad)).toBeGreaterThan(game.roadLength(frontlineRoad) * 2);
     expect(game.travelSeconds(flankRoad)).toBeGreaterThan(game.travelSeconds(frontlineRoad) * 2);
     expect(game.throughput(frontlineRoad)).toBe(2);
-    expect(game.throughput(flankRoad)).toBe(2);
+    expect(game.throughput(flankRoad)).toBe(4);
   });
 
   it("selects the configured internal siege formula", () => {
@@ -117,5 +157,123 @@ describe("Map validation", () => {
     const wrongOwner = structuredClone(config);
     wrongOwner.initialTransports[0]!.owner = "player";
     expect(() => validateMap(wrongOwner)).toThrow("owner must match its source node");
+  });
+
+  it("upgrades version 1 explicitly while preserving its direct-support siege rule", () => {
+    const current = structuredClone(config) as MapConfigV2;
+    const { rules: _rules, ...legacySettings } = current.settings;
+    const legacy: MapConfigV1 = {
+      ...current,
+      version: 1,
+      settings: legacySettings,
+      roads: current.roads.map(({ travelTimeMultiplier: _travelTimeMultiplier, ...road }) => road),
+    };
+    expect(legacy.version).toBe(1);
+
+    const upgraded = upgradeMap(legacy);
+
+    expect(upgraded.version).toBe(2);
+    expect(upgraded.settings.rules.siegeSupport).toBe("direct");
+    expect(upgraded.roads.every((road) => road.travelTimeMultiplier === 1)).toBe(true);
+    expect(() => validateMap(upgraded)).not.toThrow();
+
+    legacy.nodes.find((node) => node.id === "resource")!.kind = "ordinary";
+    legacy.nodes.find((node) => node.id === "resource")!.force = 0;
+    legacy.nodes.find((node) => node.id === "resource")!.production = 0;
+    const legacyGame = new Simulation(legacy);
+    legacyGame.node("frontline").force = 100;
+    expect(legacyGame.startTransport("player-base", "frontline", "player")).not.toBeNull();
+    legacyGame.step(legacy.settings.siegeHalfLifeSeconds);
+    expect(legacyGame.node("frontline").force).toBe(100);
+  });
+
+  it("requires explicit version 2 rules and road travel multipliers", () => {
+    const missingRules = rootedConfig() as unknown as { settings: Record<string, unknown> };
+    delete missingRules.settings.rules;
+    expect(() => validateMap(missingRules)).toThrow("Version 2 rules must be a JSON object");
+
+    const missingTravelMultiplier = rootedConfig() as unknown as { roads: Array<Record<string, unknown>> };
+    delete missingTravelMultiplier.roads[0]!.travelTimeMultiplier;
+    expect(() => validateMap(missingTravelMultiplier)).toThrow('Road "attack-frontline" travelTimeMultiplier must be a number greater than or equal to 1');
+
+    const unsupportedFog = rootedConfig();
+    unsupportedFog.settings.rules.fogOfWar.enabled = true;
+    expect(() => validateMap(unsupportedFog)).toThrow("Fog of war is not implemented yet; fogOfWar enabled must be false");
+
+    const unsupportedInterdiction = rootedConfig();
+    unsupportedInterdiction.settings.rules.interdiction.enabled = true;
+    expect(() => validateMap(unsupportedInterdiction)).toThrow("Interdiction is not implemented yet; interdiction enabled must be false");
+  });
+
+  it("applies a version 2 road travel multiplier without changing throughput", () => {
+    const normal = new Simulation(rootedConfig());
+    const slowedConfig = rootedConfig();
+    slowedConfig.roads.find((road) => road.id === "attack-frontline")!.travelTimeMultiplier = 3;
+    const slowed = new Simulation(slowedConfig);
+
+    expect(slowed.travelSeconds(slowed.roadBetween("player-base", "frontline")!))
+      .toBeCloseTo(normal.travelSeconds(normal.roadBetween("player-base", "frontline")!) * 3);
+    expect(slowed.throughput(slowed.roadBetween("player-base", "frontline")!))
+      .toBe(normal.throughput(normal.roadBetween("player-base", "frontline")!));
+  });
+});
+
+describe("rooted supply siege", () => {
+  it("protects an ordinary node through a rooted multi-hop support cycle", () => {
+    const map = rootedConfig();
+    map.initialTransports.push(
+      { source: "enemy-resource", target: "cycle-b", owner: "enemy" },
+      { source: "cycle-b", target: "cycle-c", owner: "enemy" },
+      { source: "cycle-c", target: "cycle-a", owner: "enemy" },
+      { source: "cycle-a", target: "cycle-b", owner: "enemy" },
+    );
+    const game = new Simulation(map);
+    expect(game.startTransport("player-base", "cycle-a", "player")).not.toBeNull();
+
+    game.step(map.settings.siegeHalfLifeSeconds);
+
+    expect(game.node("cycle-a").owner).toBe("enemy");
+    expect(game.node("cycle-a").force).toBe(0);
+  });
+
+  it("does not treat an isolated circular support chain as supplied", () => {
+    const map = rootedConfig();
+    map.nodes.find((node) => node.id === "cycle-a")!.force = 100;
+    map.initialTransports.push(
+      { source: "cycle-a", target: "cycle-b", owner: "enemy" },
+      { source: "cycle-b", target: "cycle-c", owner: "enemy" },
+      { source: "cycle-c", target: "cycle-a", owner: "enemy" },
+    );
+    const game = new Simulation(map);
+    expect(game.startTransport("player-base", "cycle-a", "player")).not.toBeNull();
+
+    game.step(map.settings.siegeHalfLifeSeconds);
+
+    expect(game.node("cycle-a").force).toBeCloseTo(40, 1);
+  });
+
+  it("keeps bases and resources free from siege decay without making them invulnerable", () => {
+    const map = rootedConfig();
+    const game = new Simulation(map);
+    expect(game.startTransport("player-base", "enemy-base", "player")).not.toBeNull();
+    expect(game.startTransport("player-base", "enemy-resource", "player")).not.toBeNull();
+
+    game.step(map.settings.siegeHalfLifeSeconds);
+
+    expect(game.node("enemy-base").force).toBe(100);
+    expect(game.node("enemy-resource").force).toBe(0);
+  });
+
+  it("starts siege when capture removes the root of an active support route", () => {
+    const map = rootedConfig();
+    map.initialTransports.push({ source: "enemy-resource", target: "frontline", owner: "enemy" });
+    const game = new Simulation(map);
+    expect(game.startTransport("player-base", "frontline", "player")).not.toBeNull();
+    game.node("enemy-resource").owner = "player";
+
+    game.step(map.settings.siegeHalfLifeSeconds);
+
+    expect(game.node("frontline").force).toBeCloseTo(50, 1);
+    expect(game.transports.find((transport) => transport.source === "enemy-resource")?.active).toBe(false);
   });
 });
