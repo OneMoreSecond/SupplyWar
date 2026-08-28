@@ -2,7 +2,7 @@ import { chromium } from "playwright";
 
 const baseURL = process.argv[2] ?? "http://127.0.0.1:4173";
 const browser = await chromium.launch({ headless: true });
-const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 1 });
+const page = await browser.newPage({ viewport: { width: 1440, height: 1000 }, deviceScaleFactor: 2 });
 
 try {
   await page.goto(`${baseURL}/?level=demo`, { waitUntil: "networkidle" });
@@ -18,6 +18,9 @@ try {
     enemyNodes: Number(canvas.dataset.enemyNodes),
     activeEnemyTransports: Number(canvas.dataset.activeEnemyTransports),
     cameraZoom: Number(canvas.dataset.cameraZoom),
+    nodeRadius: Number(canvas.dataset.nodeRadius),
+    labelsVisible: canvas.dataset.nodeLabelsVisible === "true",
+    devicePixelRatio: Number(canvas.dataset.devicePixelRatio),
     visibleNodes: Number(canvas.dataset.visibleNodes),
     discoveredNodes: Number(canvas.dataset.discoveredNodes),
   }));
@@ -26,6 +29,9 @@ try {
   if (state.visibleNodes >= 32) throw new Error(`Fog did not hide live map state: ${JSON.stringify(state)}`);
   if (state.discoveredNodes < state.visibleNodes) throw new Error(`Discovery state is inconsistent: ${JSON.stringify(state)}`);
   if (!await page.getByRole("button", { name: /Interdict/ }).isVisible()) throw new Error("Interdiction HUD is missing");
+  if (state.devicePixelRatio !== 2) throw new Error(`Canvas did not use the browser pixel ratio: ${JSON.stringify(state)}`);
+  if (state.labelsVisible) throw new Error(`Zoomed-out node labels should be hidden: ${JSON.stringify(state)}`);
+  if (await page.locator("#timer-value").textContent() !== "00:18") throw new Error("Formal timer did not track simulation time");
   const renderTiming = await page.evaluate(() => new Promise((resolve) => {
     const samples = [];
     let previous = performance.now();
@@ -40,7 +46,15 @@ try {
   if (renderTiming.averageMs > 30) throw new Error(`Average frame interval is too high: ${JSON.stringify(renderTiming)}`);
 
   await page.screenshot({ path: "agents/tmp/2026-08-28-demo-plan/output/demo-baseline.png", fullPage: true });
-  process.stdout.write(`${JSON.stringify({ options, state, renderTiming })}\n`);
+  const canvasBox = await page.locator("#game").boundingBox();
+  if (!canvasBox) throw new Error("Canvas has no bounds");
+  await page.mouse.move(canvasBox.x + canvasBox.width / 2, canvasBox.y + canvasBox.height / 2);
+  await page.mouse.wheel(0, -800);
+  await page.waitForFunction((initialRadius) => Number(document.querySelector("#game")?.dataset.nodeRadius) > initialRadius, state.nodeRadius);
+  const zoomed = await page.locator("#game").evaluate((canvas) => ({ cameraZoom: Number(canvas.dataset.cameraZoom), nodeRadius: Number(canvas.dataset.nodeRadius), labelsVisible: canvas.dataset.nodeLabelsVisible === "true" }));
+  if (!zoomed.labelsVisible) throw new Error(`Node labels did not appear at close zoom: ${JSON.stringify(zoomed)}`);
+  if (Math.abs(zoomed.nodeRadius - 32 * zoomed.cameraZoom) > 0.05) throw new Error(`Node shape did not scale with camera zoom: ${JSON.stringify(zoomed)}`);
+  process.stdout.write(`${JSON.stringify({ options, state, zoomed, renderTiming })}\n`);
 } finally {
   await browser.close();
 }

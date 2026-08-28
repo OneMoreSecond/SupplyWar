@@ -10,9 +10,9 @@ Capture the enemy base before the enemy captures the player base. Tutorials intr
 
 1. Start transports from owned nodes across unused adjacent roads.
 2. Capture neutral nodes and sparse resource nodes to expand production.
-3. Reveal adjacent territory, reinforce threatened holdings, and cut hostile support roots.
+3. Reveal adjacent territory, reinforce threatened holdings, and cut hostile support chains.
 4. Interdict a visible hostile route to suspend its dispatch and support during a configured window.
-5. Attack unsupported ordinary nodes with siege; capture bases and resources through arriving force.
+5. Siege unsupported ordinary/resource nodes; capture a base through arriving force after its guards fall.
 6. Capture `enemy-base` to win while protecting `player-base`. Source: current rules in [`src/game.ts`](../../src/game.ts) and Demo goal in [`doc/Demo.md`](../Demo.md).
 
 ## Terms
@@ -23,9 +23,10 @@ Capture the enemy base before the enemy captures the player base. Tutorials intr
 | Road | An undirected connection with capacity width and, in version 2, a travel-time multiplier | [`src/game.ts`](../../src/game.ts) |
 | Transport | A continuous source-to-target force flow; one active transport may occupy a road | [`src/game.ts`](../../src/game.ts) |
 | Support | An active transport whose current target has the same owner | [`src/game.ts`](../../src/game.ts) |
-| Supply root | A player- or enemy-owned base or resource | Approved rule in [`doc/Demo.md`](../Demo.md); implementation in [`src/game.ts`](../../src/game.ts) |
+| Supply root | A player- or enemy-owned base | User rule change, 2026-08-28; implementation in [`src/game.ts`](../../src/game.ts) |
 | Rooted support | A directed chain of active same-owner support transports starting at a supply root | Approved rule in [`doc/Demo.md`](../Demo.md); implementation in [`src/game.ts`](../../src/game.ts) |
-| Siege | Exponential attrition applied to an attacked ordinary node without valid supply | [`src/game.ts`](../../src/game.ts) |
+| Guard | A node listed in a target's `guardedBy`; while guard and target share an owner, a hostile transport cannot start toward the target | User Tutorial 4 requirement, 2026-08-28; [`src/game.ts`](../../src/game.ts) |
+| Siege | Exponential attrition applied to an attacked non-base node without valid supply; a base remains supplied as a root | [`src/game.ts`](../../src/game.ts) |
 | Fog | Live state for owned nodes and their immediate neighbors; discovered geography remains without current owner/force | [`src/visibility.ts`](../../src/visibility.ts), [`src/game-view.ts`](../../src/game-view.ts) |
 | Interdiction | A timed suspension of one visible hostile route; the route remains occupied while dispatch and support stop | [`src/game.ts`](../../src/game.ts), [`src/main.ts`](../../src/main.ts) |
 
@@ -34,7 +35,7 @@ Capture the enemy base before the enemy captures the player base. Tutorials intr
 | Rule | Current behavior | Source |
 | --- | --- | --- |
 | Production | Every non-neutral node adds its configured production; nodes have no force cap | [`src/game.ts`](../../src/game.ts) |
-| Start | Source ownership must match the initiator, target must be adjacent, and the road must be unused | [`src/game.ts`](../../src/game.ts) |
+| Start | Source ownership must match the initiator, target must be adjacent and unguarded, and the road must be unused | [`src/game.ts`](../../src/game.ts) |
 | Throughput | `road.width × forcePerWidthUnit` | [`src/game.ts`](../../src/game.ts) |
 | Latency | Geometry distance × `secondsPerDistanceUnit` × version-2 `travelTimeMultiplier` | [`src/game.ts`](../../src/game.ts) |
 | Continuous flow | Each logic tick sends up to available throughput; an empty source pauses and later resumes | [`src/game.ts`](../../src/game.ts) |
@@ -46,13 +47,15 @@ Capture the enemy base before the enemy captures the player base. Tutorials intr
 
 ## Rooted siege
 
-Maintained version-2 maps use `siegeSupport: "rooted"`. A player- or enemy-owned base/resource is its own supply root. An ordinary node is supplied only when a directed path of active same-owner support transports reaches it from such a root. An isolated circular support chain is not supplied; connecting the cycle to a root supplies every reachable node. Source: approved rule in [`doc/Demo.md`](../Demo.md), implementation and cycle/root tests in [`src/game.ts`](../../src/game.ts) and [`test/game.test.ts`](../../test/game.test.ts).
+Maintained version-2 maps use `siegeSupport: "rooted"`. Each player- or enemy-owned base is a supply root. An ordinary or resource node is supplied only when a directed path of active same-owner support transports reaches it from a base. An isolated circular support chain is not supplied; connecting the cycle to a base supplies every reachable node. Source: user supply-root change, 2026-08-28; implementation and cycle/root tests in [`src/game.ts`](../../src/game.ts) and [`test/game.test.ts`](../../test/game.test.ts).
 
 An attacked unsupplied node follows:
 
 `force = force × 0.5^(elapsedSeconds / halfLifeSeconds)`
 
-At force `<= 0.01`, it surrenders to the active attacker with a zero-force garrison. Bases and resources do not receive siege decay but remain capturable through hostile packets. Version-1 maps explicitly upgrade with `siegeSupport: "direct"` so their old direct-support behavior is preserved. Source: [`src/game.ts`](../../src/game.ts) and [`test/game.test.ts`](../../test/game.test.ts).
+At force `<= 0.01`, it surrenders to the active attacker with a zero-force garrison. A base does not receive rooted siege decay because it supplies itself; a resource is siegeable when no base-rooted chain reaches it. Version-1 maps explicitly upgrade with `siegeSupport: "direct"` so their old direct-support behavior is preserved. Source: user supply-root change, 2026-08-28; [`src/game.ts`](../../src/game.ts) and [`test/game.test.ts`](../../test/game.test.ts).
+
+Guard applies when a hostile transport starts: every node named by `guardedBy` must no longer share the target's owner. Existing transports are not retroactively cancelled if ownership later changes. Tutorial 4 uses this rule to make Strong Front mandatory before Enemy Base. Source: user Guard requirement, 2026-08-28; [`src/game.ts`](../../src/game.ts), [`maps/tutorial-4-siege.json`](../../maps/tutorial-4-siege.json), and [`test/levels.test.ts`](../../test/levels.test.ts).
 
 ## Computer AI
 

@@ -9,6 +9,12 @@ The key fun point is defeating a stronger but badly positioned enemy force with 
 - Keep map data separate from the core engine to support future modding and a map editor.
 - Keep simulation and visual rendering on separate ticks.
 
+Before every map design or modification, read and apply [`doc/map-design.md`](doc/map-design.md). Source: user instruction, 2026-08-28.
+
+Canvas text must be device-pixel-ratio aware and visually crisp like surrounding DOM text. Source: user visual-design instruction, 2026-08-28.
+
+When display space is limited, explicitly prioritize information and hide lower-priority elements before shrinking or obscuring higher-priority elements. Source: user visual-design instruction, 2026-08-28.
+
 Road crossings are allowed by the game and editor. Avoiding crossings is a map-design preference, not a project requirement. Source: user review, 2026-08-27.
 
 ## Current prototype
@@ -30,3 +36,7 @@ When a shell search pattern contains Markdown backticks, wrap the pattern in sin
 `editor.html` places `.editor-header` beside `main.editor-layout`, not inside it. Page-wide editor text assertions should query `body`; reserve `main` for preview/form content. Source: agent browser-test mistake, 2026-08-28.
 
 Use exact accessible-label matching when one editor label prefixes others, such as `Interdiction`, `Interdiction duration`, and `Interdiction cooldown`. Source: agent browser-test mistake, 2026-08-28.
+
+Browser assertions that depend on the selected map object must select that object immediately before the assertion; inspecting another object changes the editor selection. Source: agent browser-test mistake, 2026-08-28.
+
+When displaying time accumulated by fixed simulation steps, add a small floating-point tolerance before flooring to whole seconds so values such as `17.999999` do not render one second behind. Source: agent browser-test finding, 2026-08-28.

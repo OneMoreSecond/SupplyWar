@@ -23,10 +23,14 @@
   "roads": [
     { "id": "player-frontline", "a": "player-base", "b": "frontline", "width": 1, "travelTimeMultiplier": 1 },
     { "id": "frontline-resource", "a": "frontline", "b": "resource", "width": 1, "travelTimeMultiplier": 1 },
-    { "id": "resource-backup", "a": "resource", "b": "backup", "width": 1, "travelTimeMultiplier": 1 },
+    { "id": "resource-backup", "a": "resource", "b": "backup", "width": 0.25, "travelTimeMultiplier": 1 },
     { "id": "backup-base", "a": "backup", "b": "enemy-base", "width": 0.25, "travelTimeMultiplier": 1 },
     { "id": "player-resource", "a": "player-base", "b": "resource", "width": 2, "travelTimeMultiplier": 1 },
     { "id": "frontline-base", "a": "frontline", "b": "enemy-base", "width": 1, "travelTimeMultiplier": 1 }
   ],
-  "initialTransports": [ { "source": "resource", "target": "frontline", "owner": "enemy" }, { "source": "enemy-base", "target": "backup", "owner": "enemy" } ]
+  "initialTransports": [
+    { "source": "enemy-base", "target": "backup", "owner": "enemy" },
+    { "source": "backup", "target": "resource", "owner": "enemy" },
+    { "source": "resource", "target": "frontline", "owner": "enemy" }
+  ]
 }

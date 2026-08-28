@@ -95,8 +95,8 @@ describe("authored level catalog", () => {
     expect(game.startTransport("enemy-resource", "enemy-base", "player")).not.toBeNull();
     runUntil(game, () => game.winner === "player", 90);
     expect(game.winner).toBe("player");
-    expect(game.time).toBeGreaterThan(10.8);
-    expect(game.time).toBeLessThan(11.2);
+    expect(game.time).toBeGreaterThan(8.8);
+    expect(game.time).toBeLessThan(9.3);
   });
 
   it("teaches rooted siege by cutting a weak middle node through a shortcut", () => {
@@ -112,6 +112,8 @@ describe("authored level catalog", () => {
     expect(game.roadBetween("frontline", "mid")).toBeDefined();
     expect(game.roadBetween("mid", "enemy-base")).toBeDefined();
     expect(game.roadBetween("player-base", "mid")).toBeDefined();
+    expect(game.node("enemy-base").guardedBy).toEqual(["frontline"]);
+    expect(game.isGuarded("enemy-base", "player")).toBe(true);
     expect(game.node("frontline").force).toBeGreaterThan(game.node("mid").force * 5);
     expect(game.isSupplied("frontline")).toBe(true);
 
@@ -119,11 +121,14 @@ describe("authored level catalog", () => {
     runUntil(game, () => game.node("mid").owner === "player", 30);
     expect(game.node("mid").owner).toBe("player");
     expect(game.isSupplied("frontline")).toBe(false);
+    expect(game.startTransport("mid", "enemy-base", "player")).toBeNull();
 
     expect(game.startTransport("player-base", "frontline", "player")).not.toBeNull();
     runUntil(game, () => game.node("frontline").owner === "player", 60);
     expect(game.node("frontline").owner).toBe("player");
-    expect(game.startTransport("mid", "enemy-base", "player")).not.toBeNull();
+    expect(game.isGuarded("enemy-base", "player")).toBe(false);
+    expect(game.startTransport("mid", "frontline", "player")).not.toBeNull();
+    expect(game.startTransport("frontline", "enemy-base", "player")).not.toBeNull();
     runUntil(game, () => game.winner === "player", 60);
 
     expect(game.winner).toBe("player");
@@ -149,8 +154,8 @@ describe("authored level catalog", () => {
     }, 90);
 
     expect(game.winner).toBe("player");
-    expect(game.time).toBeGreaterThan(70);
-    expect(game.time).toBeLessThan(72.5);
+    expect(game.time).toBeGreaterThan(72);
+    expect(game.time).toBeLessThan(74);
   });
 
   it("provides a varied large-map baseline that the AI expands into", () => {

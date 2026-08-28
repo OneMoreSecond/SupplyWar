@@ -49,4 +49,16 @@ describe("Camera2D", () => {
     expect(camera.centerY).toBe(300);
     expect(camera.zoom).toBe(2);
   });
+
+  it("updates its viewport without moving the world center", () => {
+    const camera = new Camera2D(900, 560);
+    camera.centerX = 300;
+    camera.centerY = 200;
+
+    camera.resizeViewport(1200, 800);
+
+    expect(camera.worldToScreen({ x: 300, y: 200 })).toEqual({ x: 600, y: 400 });
+    expect(camera.centerX).toBe(300);
+    expect(camera.centerY).toBe(200);
+  });
 });

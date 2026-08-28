@@ -54,8 +54,8 @@ export const levels: readonly LevelDefinition[] = [
     pickerLabel: "Tutorial 4 — Siege",
     mechanism: "ROOTED SUPPLY CUT",
     title: "Bypass the strong frontline.",
-    briefing: "The weak resource behind the frontline is its supply root. Capture it through the shortcut to expose the stronger position to siege.",
-    hint: "Take Weak Supply through the shortcut, then attack Strong Front and finish the Enemy Base.",
+    briefing: "The base supplies Strong Front through Weak Middle. The frontline guards the base, so the shortcut can cut supply but cannot skip the siege.",
+    hint: "Take Weak Middle through the shortcut, siege Strong Front, then attack the now-unguarded Enemy Base.",
     config: siege as MapConfig,
   },
   {

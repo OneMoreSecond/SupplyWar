@@ -5,9 +5,14 @@ export class Camera2D {
   centerY: number;
   zoom = 1;
 
-  constructor(readonly viewportWidth: number, readonly viewportHeight: number) {
+  constructor(public viewportWidth: number, public viewportHeight: number) {
     this.centerX = viewportWidth / 2;
     this.centerY = viewportHeight / 2;
+  }
+
+  resizeViewport(width: number, height: number): void {
+    this.viewportWidth = width;
+    this.viewportHeight = height;
   }
 
   worldToScreen(point: Point2D): Point2D {

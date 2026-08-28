@@ -16,16 +16,18 @@
   "nodes": [
     { "id": "player-base", "label": "Your Base", "owner": "player", "force": 20, "production": 1, "kind": "base", "x": 120, "y": 260 },
     { "id": "frontline", "label": "Strong Front", "owner": "enemy", "force": 90, "production": 0, "kind": "ordinary", "x": 390, "y": 220 },
-    { "id": "mid", "label": "Weak Supply", "owner": "enemy", "force": 6, "production": 0.5, "kind": "resource", "x": 620, "y": 390 },
-    { "id": "enemy-base", "label": "Enemy Base", "owner": "enemy", "force": 12, "production": 0.2, "kind": "base", "x": 820, "y": 390 }
+    { "id": "mid", "label": "Weak Middle", "owner": "enemy", "force": 6, "production": 0.5, "kind": "ordinary", "x": 620, "y": 390 },
+    { "id": "enemy-base", "label": "Enemy Base", "owner": "enemy", "force": 12, "production": 0.2, "kind": "base", "x": 820, "y": 390, "guardedBy": ["frontline"] }
   ],
   "roads": [
     { "id": "base-frontline", "a": "player-base", "b": "frontline", "width": 0.25, "travelTimeMultiplier": 1 },
-    { "id": "frontline-mid", "a": "frontline", "b": "mid", "width": 0.25, "travelTimeMultiplier": 1 },
-    { "id": "mid-base", "a": "mid", "b": "enemy-base", "width": 1.5, "travelTimeMultiplier": 1 },
-    { "id": "shortcut", "a": "player-base", "b": "mid", "width": 1.5, "travelTimeMultiplier": 1 }
+    { "id": "frontline-mid", "a": "frontline", "b": "mid", "width": 1, "travelTimeMultiplier": 1 },
+    { "id": "mid-base", "a": "mid", "b": "enemy-base", "width": 0.25, "travelTimeMultiplier": 1 },
+    { "id": "shortcut", "a": "player-base", "b": "mid", "width": 1.5, "travelTimeMultiplier": 1 },
+    { "id": "frontline-base", "a": "frontline", "b": "enemy-base", "width": 1.5, "travelTimeMultiplier": 1 }
   ],
   "initialTransports": [
+    { "source": "enemy-base", "target": "mid", "owner": "enemy" },
     { "source": "mid", "target": "frontline", "owner": "enemy" }
   ]
 }

@@ -7,6 +7,7 @@ interface AINodeObservation {
   readonly force: number;
   readonly kind: NodeKind;
   readonly supplied: boolean;
+  readonly guarded: boolean;
   readonly threatened: boolean;
 }
 
@@ -68,6 +69,7 @@ export function createAIObservation(game: Simulation, owner: Owner): AIObservati
       force: node.force,
       kind: node.kind,
       supplied: game.isSupplied(node.id),
+      guarded: game.isGuarded(node.id, owner),
       threatened: threatened.has(node.id),
     })),
     roads: [...game.roads.values()]
@@ -93,7 +95,7 @@ function startCandidates(observation: AIObservation): StartCandidate[] {
     const a = nodes.get(road.a)!;
     const b = nodes.get(road.b)!;
     for (const [source, target] of [[a, b], [b, a]] as const) {
-      if (source.owner === observation.owner && source.force > observation.reserveForce) candidates.push({ source, target, roadId: road.id });
+      if (source.owner === observation.owner && source.force > observation.reserveForce && (target.owner === observation.owner || !target.guarded)) candidates.push({ source, target, roadId: road.id });
     }
   }
   return candidates.sort((left, right) => left.source.id.localeCompare(right.source.id) || left.target.id.localeCompare(right.target.id) || left.roadId.localeCompare(right.roadId));

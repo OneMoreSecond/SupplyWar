@@ -10,10 +10,11 @@ Source: user-confirmed MVP decisions and evidence in [the game progress record](
 | --- | --- | --- |
 | Rules and objective | [Gameplay](gameplay.md) | Transport, capture, support, siege, victory, and deferred rules |
 | Player-facing flow | [User experience](user-experience.md) | Tutorial progression, level navigation, briefing, controls, map-editor workflow, feedback, and interaction states |
+| Reusable map principles | [Map design guide](../map-design.md) | Guard, supply roots, throughput, required lessons, visual priority, and review checklist |
 | Authored scenarios | [Map design](map-design.md) | Four tutorials, revised MVP final exam, large Demo baseline, values, topology, and intended tactics |
 | Implementation | [Technology](tech.md) | Stack, engine boundaries, level catalog, simulation order, camera, data model, editor, and extension points |
 | Evidence and operating checks | [Validation](validation.md) | Automated checks, balance scenarios, game/editor browser checks, and known risk |
 
 ## Scope boundary
 
-The maintained progression teaches four mechanisms, tests them in the MVP final exam, then exposes the 32-node Central Campaign with rooted supply, fog/discovery, deterministic fog-limited AI, road latency, and timed player/AI Interdiction. Version-1 maps remain loadable with legacy direct-support siege. Human 10–15-minute pacing and fun are not yet validated. Source: [Gameplay](gameplay.md), [Technology](tech.md), [Validation](validation.md), and [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md).
+The maintained progression teaches four mechanisms, including guarded targets and base-rooted siege, tests them in the MVP final exam, then exposes the 32-node Central Campaign with fog/discovery, deterministic fog-limited AI, road latency, and timed player/AI Interdiction. The current UI has a formal timer plus high-DPI, zoom-prioritized Canvas rendering. Version-1 maps remain loadable with legacy direct-support siege. Human 10–15-minute pacing and fun are not yet validated. Source: [Gameplay](gameplay.md), [User experience](user-experience.md), [Technology](tech.md), [Validation](validation.md), and [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md).

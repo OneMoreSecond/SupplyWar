@@ -51,10 +51,9 @@ The rule-based system should be enough to achieve a fun experience.
 
 ### Siege
 
-Change: update the criteria from "no income support" to "not support route from resource or base".
-The goal is prevent "circle support" of isolated nodes.
+Change: update the criterion from "no incoming support" to "no support route from a base". Resource nodes may relay support but are not roots. Source: user rule change, 2026-08-28.
 
-This change would make resource and base nodes unable to be sieged, and become the stabilizer of frontline.
+This prevents an isolated support circle from counting as supply. Bases remain siege-stable roots; unsupported resources can be sieged. Source: user rule change, 2026-08-28; implemented behavior in [`src/game.ts`](../src/game.ts).
 
 ### Destabilize
 

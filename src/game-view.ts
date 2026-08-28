@@ -1,4 +1,5 @@
 import { type Camera2D, type Point2D } from "./camera";
+import { prepareHiDPICanvas } from "./canvas";
 import { type NodeState, type Owner, type RoadV2, type Simulation, type Transport } from "./game";
 import { type VisibilityProjection } from "./visibility";
 
@@ -20,11 +21,14 @@ export class GameView {
     this.context = canvas.getContext("2d")!;
   }
 
+  private nodeRadius(): number { return Math.max(27, 32 * this.camera.zoom); }
+  private labelsVisible(): boolean { return this.camera.zoom >= 0.65; }
+
   nodeAt(game: Simulation, visibility: VisibilityProjection, point: Point2D): NodeState | undefined {
     return [...game.nodes.values()].find((node) => {
       if (visibility.nodeVisibility(node.id) !== "visible") return false;
       const screen = this.camera.worldToScreen(node);
-      return Math.hypot(screen.x - point.x, screen.y - point.y) < 34;
+      return Math.hypot(screen.x - point.x, screen.y - point.y) < this.nodeRadius() + 3;
     });
   }
 
@@ -38,10 +42,13 @@ export class GameView {
       });
   }
 
-  draw(game: Simulation, visibility: VisibilityProjection, dragSource: string | null, dragPoint: Point2D | null, speedLabel: string): void {
-    this.context.clearRect(0, 0, this.canvas.width, this.canvas.height);
+  draw(game: Simulation, visibility: VisibilityProjection, dragSource: string | null, dragPoint: Point2D | null): void {
+    const display = prepareHiDPICanvas(this.canvas, this.context, this.camera);
+    this.canvas.dataset.nodeRadius = this.nodeRadius().toFixed(2);
+    this.canvas.dataset.nodeLabelsVisible = String(this.labelsVisible());
+    this.context.clearRect(0, 0, display.width, display.height);
     this.context.fillStyle = "#17212b";
-    this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    this.context.fillRect(0, 0, display.width, display.height);
     for (const road of game.roads.values()) {
       if (!visibility.isRoadDiscovered(road)) continue;
       const active = game.activeOnRoad(road.id);
@@ -50,11 +57,6 @@ export class GameView {
     }
     this.drawDragPreview(game, visibility, dragSource, dragPoint);
     for (const node of game.nodes.values()) this.drawNode(game, visibility, node);
-    this.context.fillStyle = "#b9c5d0";
-    this.context.font = "13px Barlow, system-ui";
-    this.context.textAlign = "left";
-    const tickRate = 1 / game.config.settings.logicTickSeconds;
-    this.context.fillText(`Simulation ${game.time.toFixed(1)}s · ${tickRate.toFixed(0)} Hz${speedLabel}`, 18, 28);
   }
 
   private drawDirectionTriangle(a: Point2D, b: Point2D, t: number, color: string): void {
@@ -126,7 +128,7 @@ export class GameView {
     const source = this.camera.worldToScreen(game.node(dragSource));
     const target = this.nodeAt(game, visibility, dragPoint);
     const road = target ? game.roadBetween(dragSource, target.id) : undefined;
-    const valid = target !== undefined && target.id !== dragSource && road !== undefined && !game.activeOnRoad(road.id);
+    const valid = target !== undefined && target.id !== dragSource && road !== undefined && !game.activeOnRoad(road.id) && !game.isGuarded(target.id, "player");
     const color = valid ? colors.player : "#b9c5d0";
     this.context.save();
     this.context.setLineDash([9, 7]);
@@ -144,26 +146,29 @@ export class GameView {
     this.context.strokeStyle = color;
     this.context.lineWidth = 4;
     this.context.beginPath();
-    this.context.arc(targetScreen.x, targetScreen.y, 38, 0, Math.PI * 2);
+    this.context.arc(targetScreen.x, targetScreen.y, this.nodeRadius() + 7, 0, Math.PI * 2);
     this.context.stroke();
   }
 
   private drawNode(game: Simulation, visibility: VisibilityProjection, node: NodeState): void {
     const screen = this.camera.worldToScreen(node);
+    const radius = this.nodeRadius();
     const nodeVisibility = visibility.nodeVisibility(node.id);
     if (nodeVisibility === "unknown") return;
     if (nodeVisibility === "discovered") {
       this.context.globalAlpha = 0.42;
       this.context.fillStyle = "#52606d";
-      this.drawNodeShape(node, screen.x, screen.y, 27);
+      this.drawNodeShape(node, screen.x, screen.y, Math.max(23, radius - 4));
       this.context.fill();
       this.context.strokeStyle = "#8795a3";
       this.context.lineWidth = 2;
       this.context.stroke();
-      this.context.fillStyle = "#a5b0ba";
-      this.context.font = "600 11px Barlow, system-ui";
-      this.context.textAlign = "center";
-      this.context.fillText(node.label, screen.x, screen.y + 48);
+      if (this.labelsVisible()) {
+        this.context.fillStyle = "#a5b0ba";
+        this.context.font = "600 11px Barlow, system-ui";
+        this.context.textAlign = "center";
+        this.context.fillText(node.label, screen.x, screen.y + radius + 20);
+      }
       this.context.globalAlpha = 1;
       return;
     }
@@ -172,11 +177,11 @@ export class GameView {
       this.context.strokeStyle = "#ff334d";
       this.context.lineWidth = 5;
       this.context.beginPath();
-      this.context.arc(screen.x, screen.y, 40 + Math.sin(game.time * 5) * 2, 0, Math.PI * 2);
+      this.context.arc(screen.x, screen.y, radius + 9 + Math.sin(game.time * 5) * 2, 0, Math.PI * 2);
       this.context.stroke();
     }
     this.context.fillStyle = colors[node.owner];
-    this.drawNodeShape(node, screen.x, screen.y, 31);
+    this.drawNodeShape(node, screen.x, screen.y, radius);
     this.context.fill();
     this.context.strokeStyle = node.kind === "base" ? "#fff" : node.kind === "resource" ? "#f0bd4f" : "#1a2530";
     this.context.lineWidth = node.kind === "ordinary" ? 2 : 5;
@@ -185,12 +190,28 @@ export class GameView {
     this.context.font = "700 18px Barlow, system-ui";
     this.context.textAlign = "center";
     this.context.fillText(String(Math.round(node.force)), screen.x, screen.y + 6);
-    this.context.fillStyle = "#dbe7ef";
-    this.context.font = "600 11px Barlow, system-ui";
-    this.context.fillText(node.label, screen.x, screen.y + (node.kind === "ordinary" ? 51 : 62));
+    if (game.isGuarded(node.id, "player")) {
+      const markerX = screen.x + radius * 0.72;
+      const markerY = screen.y - radius * 0.72;
+      this.context.fillStyle = "#f0bd4f";
+      this.context.beginPath();
+      this.context.moveTo(markerX, markerY - 7);
+      this.context.lineTo(markerX + 7, markerY - 2);
+      this.context.lineTo(markerX + 5, markerY + 7);
+      this.context.lineTo(markerX, markerY + 10);
+      this.context.lineTo(markerX - 5, markerY + 7);
+      this.context.lineTo(markerX - 7, markerY - 2);
+      this.context.closePath();
+      this.context.fill();
+    }
+    if (this.labelsVisible()) {
+      this.context.fillStyle = "#dbe7ef";
+      this.context.font = "600 11px Barlow, system-ui";
+      this.context.fillText(node.label, screen.x, screen.y + radius + 20);
+    }
     if (node.kind === "ordinary") return;
     this.context.fillStyle = "#f0bd4f";
     this.context.font = "700 11px Barlow, system-ui";
-    this.context.fillText(node.kind === "resource" ? `+${node.production}/s` : "BASE", screen.x, screen.y - 43);
+    this.context.fillText(node.kind === "resource" ? `+${node.production}/s` : "BASE", screen.x, screen.y - radius - 12);
   }
 }

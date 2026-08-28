@@ -38,6 +38,7 @@ function rootedConfig(): MapConfigV2 {
       { id: "cycle-b-c", a: "cycle-b", b: "cycle-c", width: 1, travelTimeMultiplier: 1 },
       { id: "cycle-c-a", a: "cycle-c", b: "cycle-a", width: 1, travelTimeMultiplier: 1 },
       { id: "root-cycle", a: "enemy-resource", b: "cycle-b", width: 1, travelTimeMultiplier: 1 },
+      { id: "base-resource", a: "enemy-base", b: "enemy-resource", width: 1, travelTimeMultiplier: 1 },
       { id: "attack-base", a: "player-base", b: "enemy-base", width: 1, travelTimeMultiplier: 1 },
       { id: "attack-resource", a: "player-base", b: "enemy-resource", width: 1, travelTimeMultiplier: 1 },
     ],
@@ -202,6 +203,20 @@ describe("Map validation", () => {
     expect(() => validateMap(enabledRules)).not.toThrow();
   });
 
+  it("validates Guard references", () => {
+    const unknownGuard = rootedConfig();
+    unknownGuard.nodes.find((node) => node.id === "enemy-base")!.guardedBy = ["missing"];
+    expect(() => validateMap(unknownGuard)).toThrow('Guard "missing" on node "enemy-base" must reference an existing node');
+
+    const selfGuard = rootedConfig();
+    selfGuard.nodes.find((node) => node.id === "enemy-base")!.guardedBy = ["enemy-base"];
+    expect(() => validateMap(selfGuard)).toThrow('Node "enemy-base" cannot guard itself');
+
+    const duplicateGuard = rootedConfig();
+    duplicateGuard.nodes.find((node) => node.id === "enemy-base")!.guardedBy = ["frontline", "frontline"];
+    expect(() => validateMap(duplicateGuard)).toThrow('Guard "frontline" is duplicated on node "enemy-base"');
+  });
+
   it("applies a version 2 road travel multiplier without changing throughput", () => {
     const normal = new Simulation(rootedConfig());
     const slowedConfig = rootedConfig();
@@ -219,6 +234,7 @@ describe("rooted supply siege", () => {
   it("protects an ordinary node through a rooted multi-hop support cycle", () => {
     const map = rootedConfig();
     map.initialTransports.push(
+      { source: "enemy-base", target: "enemy-resource", owner: "enemy" },
       { source: "enemy-resource", target: "cycle-b", owner: "enemy" },
       { source: "cycle-b", target: "cycle-c", owner: "enemy" },
       { source: "cycle-c", target: "cycle-a", owner: "enemy" },
@@ -249,8 +265,9 @@ describe("rooted supply siege", () => {
     expect(game.node("cycle-a").force).toBeCloseTo(40, 1);
   });
 
-  it("keeps bases and resources free from siege decay without making them invulnerable", () => {
+  it("keeps bases free from siege decay while allowing unsupported resources to be sieged", () => {
     const map = rootedConfig();
+    map.nodes.find((node) => node.id === "enemy-resource")!.force = 100;
     const game = new Simulation(map);
     expect(game.startTransport("player-base", "enemy-base", "player")).not.toBeNull();
     expect(game.startTransport("player-base", "enemy-resource", "player")).not.toBeNull();
@@ -258,12 +275,15 @@ describe("rooted supply siege", () => {
     game.step(map.settings.siegeHalfLifeSeconds);
 
     expect(game.node("enemy-base").force).toBe(100);
-    expect(game.node("enemy-resource").force).toBe(0);
+    expect(game.node("enemy-resource").force).toBeCloseTo(50, 1);
   });
 
   it("starts siege when capture removes the root of an active support route", () => {
     const map = rootedConfig();
-    map.initialTransports.push({ source: "enemy-resource", target: "frontline", owner: "enemy" });
+    map.initialTransports.push(
+      { source: "enemy-base", target: "enemy-resource", owner: "enemy" },
+      { source: "enemy-resource", target: "frontline", owner: "enemy" },
+    );
     const game = new Simulation(map);
     expect(game.startTransport("player-base", "frontline", "player")).not.toBeNull();
     game.node("enemy-resource").owner = "player";
@@ -275,18 +295,36 @@ describe("rooted supply siege", () => {
   });
 });
 
+describe("Guard", () => {
+  it("blocks hostile transport until every same-owner guard is captured", () => {
+    const map = rootedConfig();
+    map.nodes.find((node) => node.id === "enemy-base")!.guardedBy = ["frontline"];
+    const game = new Simulation(map);
+
+    expect(game.isGuarded("enemy-base", "player")).toBe(true);
+    expect(game.startTransport("player-base", "enemy-base", "player")).toBeNull();
+
+    game.node("frontline").owner = "player";
+    expect(game.isGuarded("enemy-base", "player")).toBe(false);
+    expect(game.startTransport("player-base", "enemy-base", "player")).not.toBeNull();
+  });
+});
+
 describe("Interdiction", () => {
   function interdictionGame(): Simulation {
     const map = rootedConfig();
     map.settings.rules.interdiction = { enabled: true, durationSeconds: 2, cooldownSeconds: 5 };
     map.nodes.find((node) => node.id === "enemy-resource")!.force = 20;
-    map.initialTransports.push({ source: "enemy-resource", target: "frontline", owner: "enemy" });
+    map.initialTransports.push(
+      { source: "enemy-base", target: "enemy-resource", owner: "enemy" },
+      { source: "enemy-resource", target: "frontline", owner: "enemy" },
+    );
     return new Simulation(map);
   }
 
   it("temporarily pauses dispatch and rooted support", () => {
     const game = interdictionGame();
-    const support = game.transports[0]!;
+    const support = game.transports[1]!;
     expect(game.isSupplied("frontline")).toBe(true);
 
     expect(game.interdictTransport(support.id, "player")).toBe(true);
@@ -304,7 +342,7 @@ describe("Interdiction", () => {
 
   it("preserves packets already in flight", () => {
     const game = interdictionGame();
-    const support = game.transports[0]!;
+    const support = game.transports[1]!;
     game.step();
     expect(support.packets.length).toBeGreaterThan(0);
     const frontlineForce = game.node("frontline").force;
@@ -317,7 +355,7 @@ describe("Interdiction", () => {
 
   it("enforces ownership, feature, active-target, and cooldown rules", () => {
     const game = interdictionGame();
-    const support = game.transports[0]!;
+    const support = game.transports[1]!;
     expect(game.interdictTransport(support.id, "enemy")).toBe(false);
     expect(game.interdictTransport("missing", "player")).toBe(false);
     expect(game.interdictTransport(support.id, "player")).toBe(true);

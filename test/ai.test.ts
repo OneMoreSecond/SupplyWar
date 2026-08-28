@@ -104,4 +104,14 @@ describe("computer AI", () => {
     expect(observation.nodes.some((node) => node.id === "hidden")).toBe(false);
     expect(observation.roads.some((road) => road.id === "neutral-hidden")).toBe(false);
   });
+
+  it("does not repeatedly choose a target protected by a Guard", () => {
+    const map = aiMap();
+    map.nodes.find((node) => node.id === "neutral-resource")!.owner = "enemy";
+    map.nodes.find((node) => node.id === "neutral-node")!.owner = "enemy";
+    map.nodes.find((node) => node.id === "player-outpost")!.guardedBy = ["player-base"];
+    const command = chooseAICommand(createAIObservation(new Simulation(map), "enemy"));
+
+    expect(command).not.toEqual({ type: "start-transport", source: "enemy-outpost", target: "player-outpost" });
+  });
 });

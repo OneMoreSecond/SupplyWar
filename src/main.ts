@@ -23,6 +23,7 @@ const speedInput = document.querySelector<HTMLInputElement>("#playtest-speed")!;
 const speedValue = document.querySelector<HTMLOutputElement>("#speed-value")!;
 const interdictButton = document.querySelector<HTMLButtonElement>("#interdict")!;
 const interdictHelp = document.querySelector<HTMLElement>("#interdict-help")!;
+const timerValue = document.querySelector<HTMLTimeElement>("#timer-value")!;
 
 type Page = { config: MapConfig; mode: "level"; level: LevelDefinition } | { config: MapConfig; mode: "playtest" | "fallback"; level?: undefined };
 
@@ -90,7 +91,8 @@ levelPicker.addEventListener("change", () => {
 
 let game = new Simulation(config);
 let visibility = new VisibilityProjection(game, "player");
-const camera = new Camera2D(canvas.width, canvas.height);
+const initialCanvasBounds = canvas.getBoundingClientRect();
+const camera = new Camera2D(initialCanvasBounds.width || canvas.width, initialCanvasBounds.height || canvas.height);
 const view = new GameView(canvas, camera);
 camera.fit(config.nodes);
 let dragSource: string | null = null;
@@ -145,7 +147,7 @@ nextLevelButton.addEventListener("click", () => {
 
 function toCanvas(event: MouseEvent): Point2D {
   const rect = canvas.getBoundingClientRect();
-  return { x: (event.clientX - rect.left) * canvas.width / rect.width, y: (event.clientY - rect.top) * canvas.height / rect.height };
+  return { x: event.clientX - rect.left, y: event.clientY - rect.top };
 }
 
 function nodeAt(point: Point2D): NodeState | undefined {
@@ -155,11 +157,19 @@ function nodeAt(point: Point2D): NodeState | undefined {
 function canStartPlayerTransport(source: string, target: NodeState | undefined): boolean {
   if (!target || target.id === source) return false;
   const road = game.roadBetween(source, target.id);
-  return road !== undefined && !game.activeOnRoad(road.id);
+  return road !== undefined && !game.activeOnRoad(road.id) && !game.isGuarded(target.id, "player");
+}
+
+function formatTimer(seconds: number): string {
+  const wholeSeconds = Math.max(0, Math.floor(seconds + 1e-6));
+  const minutes = Math.floor(wholeSeconds / 60);
+  return `${String(minutes).padStart(2, "0")}:${String(wholeSeconds % 60).padStart(2, "0")}`;
 }
 
 function render(): void {
-  view.draw(game, visibility, dragSource, dragPoint, page.mode === "playtest" ? ` · ${speedMultiplier}×` : "");
+  view.draw(game, visibility, dragSource, dragPoint);
+  timerValue.textContent = formatTimer(game.time);
+  timerValue.dateTime = `PT${Math.max(0, Math.floor(game.time + 1e-6))}S`;
   canvas.dataset.simulationTime = game.time.toFixed(2);
   canvas.dataset.levelId = page.level?.id ?? page.mode;
   canvas.dataset.cameraX = camera.centerX.toFixed(2);
@@ -191,6 +201,9 @@ function render(): void {
     status.textContent = actionMessage.text;
   } else if (dragSource && canStartPlayerTransport(dragSource, target)) {
     status.textContent = `Release to send forces to ${target!.label}.`;
+  } else if (dragSource && target && game.isGuarded(target.id, "player")) {
+    const guards = game.guardingNodes(target.id, "player").map((guard) => guard.label).join(", ");
+    status.textContent = `${target.label} is guarded by ${guards}. Capture the Guard first.`;
   } else if (dragSource) {
     status.textContent = "Drag to an unused adjacent road, then release.";
   } else {

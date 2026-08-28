@@ -1,6 +1,7 @@
 import "./editor.css";
 import defaultMap from "../maps/mvp.json";
 import { Camera2D, type Point2D } from "./camera";
+import { prepareHiDPICanvas } from "./canvas";
 import { validateMap, type MapNode, type MapSettingsV1, type MapTransport, type NodeKind, type Owner, type RuleSettings } from "./game";
 import { playtestFileNameKey, playtestMapKey } from "./playtest";
 
@@ -27,7 +28,8 @@ const nodeCount = document.querySelector<HTMLElement>("#node-count")!;
 const roadCount = document.querySelector<HTMLElement>("#road-count")!;
 const zoomLevel = document.querySelector<HTMLElement>("#zoom-level")!;
 const fitMapButton = document.querySelector<HTMLButtonElement>("#fit-map")!;
-const camera = new Camera2D(preview.width, preview.height);
+const initialPreviewBounds = preview.getBoundingClientRect();
+const camera = new Camera2D(initialPreviewBounds.width || preview.width, initialPreviewBounds.height || preview.height);
 
 const ownerOptions: Owner[] = ["player", "enemy", "neutral"];
 const kindOptions: NodeKind[] = ["base", "resource", "ordinary"];
@@ -283,14 +285,23 @@ function renderInspector(): void {
         if (transport.source === previousId) transport.source = value;
         if (transport.target === previousId) transport.target = value;
       }
+      for (const candidate of draft.nodes) {
+        if (candidate.guardedBy) candidate.guardedBy = candidate.guardedBy.map((guard) => guard === previousId ? value : guard);
+      }
       previousId = value;
     });
     id.addEventListener("change", () => renderAll());
+    const guardedBy = textInput((node.guardedBy ?? []).join(", "), (value) => {
+      const guards = value.split(",").map((guard) => guard.trim()).filter(Boolean);
+      if (guards.length === 0) delete node.guardedBy; else node.guardedBy = guards;
+    });
+    guardedBy.required = false;
     item.fields.append(
       field("ID", id),
       field("Label", textInput(node.label, (value) => { node.label = value; })),
       field("Owner", selectInput(node.owner, ownerOptions, (value) => { node.owner = value; })),
       field("Kind", selectInput(node.kind, kindOptions, (value) => { node.kind = value; })),
+      field("Guarded by node IDs", guardedBy, "Comma-separated IDs. Hostile routes are blocked while a listed Guard shares this node's owner."),
       field("Force", numberInput(node.force, (value) => { node.force = value; }, 0)),
       field("Production / second", numberInput(node.production, (value) => { node.production = value; }, 0)),
       field("X", numberInput(node.x, (value) => { node.x = value; })),
@@ -332,15 +343,18 @@ function roadBetween(a: string, b: string): EditableRoad | undefined {
 
 function connectorPoint(node: MapNode): { x: number; y: number } {
   const screen = camera.worldToScreen(node);
+  const offset = previewNodeRadius() + 2;
   return {
-    x: screen.x > preview.width - 40 ? screen.x - 25 : screen.x + 25,
-    y: screen.y < 40 ? screen.y + 25 : screen.y - 25,
+    x: screen.x > camera.viewportWidth - 40 ? screen.x - offset : screen.x + offset,
+    y: screen.y < 40 ? screen.y + offset : screen.y - offset,
   };
 }
 
+function previewNodeRadius(): number { return Math.max(20, 23 * camera.zoom); }
+
 function drawGrid(): void {
   const topLeft = camera.screenToWorld({ x: 0, y: 0 });
-  const bottomRight = camera.screenToWorld({ x: preview.width, y: preview.height });
+  const bottomRight = camera.screenToWorld({ x: camera.viewportWidth, y: camera.viewportHeight });
   let spacing = 100;
   while (spacing * camera.zoom < 45) spacing *= 2;
   while (spacing * camera.zoom > 130) spacing /= 2;
@@ -352,22 +366,23 @@ function drawGrid(): void {
     const screenX = camera.worldToScreen({ x, y: 0 }).x;
     context.beginPath();
     context.moveTo(screenX, 0);
-    context.lineTo(screenX, preview.height);
+    context.lineTo(screenX, camera.viewportHeight);
     context.stroke();
   }
   for (let y = startY; y <= bottomRight.y; y += spacing) {
     const screenY = camera.worldToScreen({ x: 0, y }).y;
     context.beginPath();
     context.moveTo(0, screenY);
-    context.lineTo(preview.width, screenY);
+    context.lineTo(camera.viewportWidth, screenY);
     context.stroke();
   }
 }
 
 function drawPreview(): void {
-  context.clearRect(0, 0, preview.width, preview.height);
+  const display = prepareHiDPICanvas(preview, context, camera);
+  context.clearRect(0, 0, display.width, display.height);
   context.fillStyle = "#17212b";
-  context.fillRect(0, 0, preview.width, preview.height);
+  context.fillRect(0, 0, display.width, display.height);
   drawGrid();
   zoomLevel.textContent = `${Math.round(camera.zoom * 100)}%`;
   preview.dataset.cameraX = camera.centerX.toFixed(2);
@@ -408,24 +423,27 @@ function drawPreview(): void {
   for (const node of draft.nodes) {
     if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) continue;
     const screen = camera.worldToScreen(node);
+    const radius = previewNodeRadius();
     if (selection?.kind === "node" && selection.node === node) {
       context.strokeStyle = "#f0bd4f";
       context.lineWidth = 3;
       context.beginPath();
-      context.arc(screen.x, screen.y, 30, 0, Math.PI * 2);
+      context.arc(screen.x, screen.y, radius + 7, 0, Math.PI * 2);
       context.stroke();
     }
     context.fillStyle = ownerColors[node.owner] ?? "#8d9aa7";
     context.beginPath();
-    context.arc(screen.x, screen.y, node === movingNode ? 25 : 23, 0, Math.PI * 2);
+    context.arc(screen.x, screen.y, node === movingNode ? radius + 2 : radius, 0, Math.PI * 2);
     context.fill();
     context.strokeStyle = node.kind === "base" ? "#ffffff" : node.kind === "resource" ? "#f0bd4f" : "#17212b";
     context.lineWidth = node.kind === "ordinary" ? 2 : 4;
     context.stroke();
-    context.fillStyle = "#e6edf3";
-    context.font = "600 13px Barlow, system-ui";
-    context.textAlign = "center";
-    context.fillText(node.label || node.id || "Untitled", screen.x, screen.y + 42);
+    if (camera.zoom >= 0.65) {
+      context.fillStyle = "#e6edf3";
+      context.font = "600 13px Barlow, system-ui";
+      context.textAlign = "center";
+      context.fillText(node.label || node.id || "Untitled", screen.x, screen.y + radius + 19);
+    }
 
     const connector = connectorPoint(node);
     context.fillStyle = node === roadSource ? "#42c97a" : "#dbe7ef";
@@ -483,7 +501,7 @@ function nextId(prefix: string, existing: string[]): string {
 }
 
 document.querySelector<HTMLButtonElement>("#add-node")!.addEventListener("click", () => {
-  const center = camera.screenToWorld({ x: preview.width / 2, y: preview.height / 2 });
+  const center = camera.screenToWorld({ x: camera.viewportWidth / 2, y: camera.viewportHeight / 2 });
   const node: MapNode = { id: nextId("node", draft.nodes.map((candidate) => candidate.id)), label: "New Node", owner: "neutral", force: 0, production: 0, kind: "ordinary", x: Math.round(center.x), y: Math.round(center.y) };
   draft.nodes.push(node);
   selection = { kind: "node", node };
@@ -552,8 +570,8 @@ playtestLink.addEventListener("click", (event) => {
 function previewPoint(event: MouseEvent): Point2D {
   const bounds = preview.getBoundingClientRect();
   return {
-    x: (event.clientX - bounds.left) * preview.width / bounds.width,
-    y: (event.clientY - bounds.top) * preview.height / bounds.height,
+    x: event.clientX - bounds.left,
+    y: event.clientY - bounds.top,
   };
 }
 
@@ -561,7 +579,7 @@ function nodeAt(point: { x: number; y: number }): MapNode | undefined {
   return [...draft.nodes].reverse().find((node) => {
     if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) return false;
     const screen = camera.worldToScreen(node);
-    return Math.hypot(screen.x - point.x, screen.y - point.y) <= 27;
+    return Math.hypot(screen.x - point.x, screen.y - point.y) <= previewNodeRadius() + 4;
   });
 }
 

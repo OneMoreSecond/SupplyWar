@@ -1,7 +1,7 @@
 export type Owner = "player" | "enemy" | "neutral";
 export type NodeKind = "base" | "resource" | "ordinary";
 
-export interface MapNode { id: string; label: string; owner: Owner; force: number; production: number; kind: NodeKind; x: number; y: number; }
+export interface MapNode { id: string; label: string; owner: Owner; force: number; production: number; kind: NodeKind; x: number; y: number; guardedBy?: string[]; }
 interface RoadFields { id: string; a: string; b: string; width: number; }
 export interface RoadV1 extends RoadFields { travelTimeMultiplier?: never; }
 export interface RoadV2 extends RoadFields { travelTimeMultiplier: number; }
@@ -60,6 +60,14 @@ export class Simulation {
   activeOnRoad(roadId: string): Transport | undefined { return this.transports.find((transport) => transport.active && transport.roadId === roadId); }
   isTransportOperational(transport: Transport): boolean { return transport.active && transport.interdictedUntil <= this.time; }
   mode(transport: Transport): "support" | "attack" { return this.node(transport.target).owner === transport.owner ? "support" : "attack"; }
+  guardingNodes(nodeId: string, attacker: Owner): NodeState[] {
+    const target = this.node(nodeId);
+    if (target.owner === attacker) return [];
+    return (target.guardedBy ?? [])
+      .map((guardId) => this.node(guardId))
+      .filter((guard) => guard.owner === target.owner);
+  }
+  isGuarded(nodeId: string, attacker: Owner): boolean { return this.guardingNodes(nodeId, attacker).length > 0; }
   isSupplied(nodeId: string): boolean {
     const node = this.node(nodeId);
     if (this.config.settings.rules.siegeSupport === "rooted") return this.suppliedNodes(node.owner).has(node.id);
@@ -70,7 +78,7 @@ export class Simulation {
   throughput(road: RoadV2): number { return road.width * this.config.settings.forcePerWidthUnit; }
 
   startTransport(source: string, target: string, owner = this.node(source).owner): Transport | null {
-    if (this.winner || owner === "neutral" || this.node(source).owner !== owner) return null;
+    if (this.winner || owner === "neutral" || this.node(source).owner !== owner || this.isGuarded(target, owner)) return null;
     const road = this.roadBetween(source, target);
     if (!road || this.activeOnRoad(road.id)) return null;
     const transport: Transport = { id: `transport-${this.nextTransport++}`, source, target, owner, roadId: road.id, active: true, interdictedUntil: 0, packets: [] };
@@ -157,7 +165,7 @@ export class Simulation {
     if (owner === "neutral") return new Set();
     const supplied = new Set(
       [...this.nodes.values()]
-        .filter((node) => node.owner === owner && (node.kind === "base" || node.kind === "resource"))
+        .filter((node) => node.owner === owner && node.kind === "base")
         .map((node) => node.id),
     );
     let changed = true;
@@ -252,6 +260,17 @@ export function validateMap(value: unknown): asserts value is MapConfig {
     nodeOwners.set(candidate.id, candidate.owner as Owner);
   }
   if (!ids.has("player-base") || !ids.has("enemy-base")) throw new Error("Maps need player-base and enemy-base nodes for victory checks");
+  for (const candidate of value.nodes) {
+    if (!isRecord(candidate) || candidate.guardedBy === undefined) continue;
+    if (!Array.isArray(candidate.guardedBy)) throw new Error(`Node "${String(candidate.id)}" guardedBy must be a JSON array`);
+    const guards = new Set<string>();
+    for (const guard of candidate.guardedBy) {
+      if (typeof guard !== "string" || !ids.has(guard)) throw new Error(`Guard "${String(guard)}" on node "${String(candidate.id)}" must reference an existing node`);
+      if (guard === candidate.id) throw new Error(`Node "${String(candidate.id)}" cannot guard itself`);
+      if (guards.has(guard)) throw new Error(`Guard "${guard}" is duplicated on node "${String(candidate.id)}"`);
+      guards.add(guard);
+    }
+  }
 
   if (!Array.isArray(value.roads)) throw new Error("Roads must be a JSON array");
   const roadIds = new Set<string>();

@@ -14,8 +14,8 @@ async function worldPoint(canvas, x, y) {
     centerX: Number(element.dataset.cameraX),
     centerY: Number(element.dataset.cameraY),
     zoom: Number(element.dataset.cameraZoom),
-    width: element.width,
-    height: element.height,
+    width: Number(element.dataset.viewportWidth) || element.clientWidth,
+    height: Number(element.dataset.viewportHeight) || element.clientHeight,
   }));
   return {
     x: box.x + box.width * ((x - camera.centerX) * camera.zoom + camera.width / 2) / camera.width,
@@ -56,6 +56,7 @@ try {
   await picker.selectOption("demo");
   await page.waitForURL(/\?level=demo$/);
   if (!await page.getByText("SUPPLY WAR · DEMO", { exact: true }).isVisible()) throw new Error("Demo label is missing");
+  if (!/^\d{2}:\d{2}$/.test(await page.locator("#timer-value").textContent())) throw new Error("Formal match timer is missing");
 
   await page.getByRole("link", { name: "Map editor" }).click();
   await page.getByRole("heading", { name: "Map editor" }).waitFor();
@@ -68,7 +69,10 @@ try {
   let inspector = page.locator("#selection-fields .editor-card");
   if (await inspector.locator("input, select").count() !== 5) throw new Error("Version 2 road inspector must expose five fields");
   if (!await inspector.getByLabel("Travel time multiplier").isVisible()) throw new Error("Road travel multiplier is missing");
+  await clickWorld(editorCanvas, 820, 150);
+  if (!await page.getByLabel("Guarded by node IDs").isVisible()) throw new Error("Guard is not editable on nodes");
 
+  await clickWorld(editorCanvas, 185, 300);
   await page.getByLabel("Version").selectOption("1");
   if (await settings.count() !== 6) throw new Error("Version 1 must hide version 2 rule controls");
   inspector = page.locator("#selection-fields .editor-card");
