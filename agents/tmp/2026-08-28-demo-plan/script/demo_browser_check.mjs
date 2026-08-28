@@ -18,12 +18,29 @@ try {
     enemyNodes: Number(canvas.dataset.enemyNodes),
     activeEnemyTransports: Number(canvas.dataset.activeEnemyTransports),
     cameraZoom: Number(canvas.dataset.cameraZoom),
+    visibleNodes: Number(canvas.dataset.visibleNodes),
+    discoveredNodes: Number(canvas.dataset.discoveredNodes),
   }));
   if (state.enemyNodes <= 9) throw new Error(`Enemy did not expand: ${JSON.stringify(state)}`);
   if (state.activeEnemyTransports === 0) throw new Error(`Enemy has no active routes: ${JSON.stringify(state)}`);
+  if (state.visibleNodes >= 32) throw new Error(`Fog did not hide live map state: ${JSON.stringify(state)}`);
+  if (state.discoveredNodes < state.visibleNodes) throw new Error(`Discovery state is inconsistent: ${JSON.stringify(state)}`);
+  if (!await page.getByRole("button", { name: /Interdict/ }).isVisible()) throw new Error("Interdiction HUD is missing");
+  const renderTiming = await page.evaluate(() => new Promise((resolve) => {
+    const samples = [];
+    let previous = performance.now();
+    function sample(now) {
+      samples.push(now - previous);
+      previous = now;
+      if (samples.length < 120) requestAnimationFrame(sample);
+      else resolve({ averageMs: samples.reduce((sum, value) => sum + value, 0) / samples.length, maxMs: Math.max(...samples) });
+    }
+    requestAnimationFrame(sample);
+  }));
+  if (renderTiming.averageMs > 30) throw new Error(`Average frame interval is too high: ${JSON.stringify(renderTiming)}`);
 
   await page.screenshot({ path: "agents/tmp/2026-08-28-demo-plan/output/demo-baseline.png", fullPage: true });
-  process.stdout.write(`${JSON.stringify({ options, state })}\n`);
+  process.stdout.write(`${JSON.stringify({ options, state, renderTiming })}\n`);
 } finally {
   await browser.close();
 }

@@ -78,8 +78,10 @@ try {
   await page.getByLabel("Version").selectOption("2");
   if (await settings.count() !== 14) throw new Error("Version 1 to version 2 conversion did not restore explicit rules");
   await page.getByLabel("Fog of war").check();
-  if (!/Fog of war is not implemented yet/.test(await page.locator("#map-status").textContent())) throw new Error("Unsupported fog configuration was not explained");
+  await page.getByLabel("Interdiction", { exact: true }).check();
+  if (!/Map is valid/.test(await page.locator("#map-status").textContent())) throw new Error("Implemented fog and Interdiction settings are not authorable");
   await page.getByLabel("Fog of war").uncheck();
+  await page.getByLabel("Interdiction", { exact: true }).uncheck();
 
   const playtest = page.getByRole("link", { name: "Playtest current map" });
   await playtest.click();
@@ -89,8 +91,40 @@ try {
   await page.waitForURL(/editor\.html\?playtest=1$/);
   if (!/Restored your playtest draft/.test(await page.locator("#map-status").textContent())) throw new Error("Editor draft did not restore after playtest");
 
+  const abilityMap = {
+    version: 2,
+    settings: {
+      logicTickSeconds: 0.1,
+      siegeFormula: "exponential-half-life",
+      siegeHalfLifeSeconds: 10,
+      secondsPerDistanceUnit: 0.01,
+      forcePerWidthUnit: 1,
+      rules: {
+        siegeSupport: "rooted",
+        computerAI: { enabled: false, decisionIntervalSeconds: 1, reserveForce: 0 },
+        fogOfWar: { enabled: true },
+        interdiction: { enabled: true, durationSeconds: 10, cooldownSeconds: 60 },
+      },
+    },
+    nodes: [
+      { id: "player-base", label: "Player Base", owner: "player", force: 20, production: 0, kind: "base", x: 200, y: 280 },
+      { id: "enemy-base", label: "Enemy Base", owner: "enemy", force: 20, production: 0, kind: "base", x: 700, y: 280 },
+    ],
+    roads: [{ id: "front", a: "player-base", b: "enemy-base", width: 1, travelTimeMultiplier: 1 }],
+    initialTransports: [{ source: "enemy-base", target: "player-base", owner: "enemy" }],
+  };
+  await page.evaluate((map) => sessionStorage.setItem("supply-war.playtest-map", JSON.stringify(map)), abilityMap);
+  await page.goto(`${baseURL}/?playtest=1`, { waitUntil: "networkidle" });
+  const abilityCanvas = page.locator("#game");
+  const interdict = page.getByRole("button", { name: /Interdict/ });
+  await interdict.click();
+  await clickWorld(abilityCanvas, 450, 280);
+  await page.waitForFunction(() => Number(document.querySelector("#game")?.dataset.activeInterdictions) === 1);
+  if (Number(await abilityCanvas.getAttribute("data-interdiction-ready-in")) <= 0) throw new Error("Player Interdiction cooldown did not start");
+  await page.screenshot({ path: "agents/tmp/2026-08-28-demo-plan/output/interdiction-active.png", fullPage: true });
+
   if (pageErrors.length > 0) throw new Error(`Page errors: ${pageErrors.join(" | ")}`);
-  process.stdout.write(`${JSON.stringify({ levels: 6, version2Settings: 14, playtestRoundTrip: true })}\n`);
+  process.stdout.write(`${JSON.stringify({ levels: 6, version2Settings: 14, playtestRoundTrip: true, interdictionInteraction: true })}\n`);
 } finally {
   await browser.close();
 }

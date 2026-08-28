@@ -1,12 +1,13 @@
 import "./style.css";
 import { applyAICommand, chooseAICommand, createAIObservation } from "./ai";
 import { Camera2D, type Point2D } from "./camera";
-import { Simulation, upgradeMap, validateMap, type MapConfig, type NodeState, type Owner, type RoadV2, type Transport } from "./game";
+import { Simulation, upgradeMap, validateMap, type MapConfig, type NodeState, type Transport } from "./game";
+import { GameView } from "./game-view";
 import { levelById, levels, nextLevel, type LevelDefinition } from "./levels";
 import { playtestMapKey } from "./playtest";
+import { VisibilityProjection } from "./visibility";
 
 const canvas = document.querySelector<HTMLCanvasElement>("#game")!;
-const context = canvas.getContext("2d")!;
 const status = document.querySelector<HTMLElement>("#status")!;
 const restart = document.querySelector<HTMLButtonElement>("#restart")!;
 const editorLink = document.querySelector<HTMLAnchorElement>("#editor-link")!;
@@ -20,6 +21,8 @@ const nextLevelButton = document.querySelector<HTMLButtonElement>("#next-level")
 const speedControl = document.querySelector<HTMLElement>("#speed-control")!;
 const speedInput = document.querySelector<HTMLInputElement>("#playtest-speed")!;
 const speedValue = document.querySelector<HTMLOutputElement>("#speed-value")!;
+const interdictButton = document.querySelector<HTMLButtonElement>("#interdict")!;
+const interdictHelp = document.querySelector<HTMLElement>("#interdict-help")!;
 
 type Page = { config: MapConfig; mode: "level"; level: LevelDefinition } | { config: MapConfig; mode: "playtest" | "fallback"; level?: undefined };
 
@@ -86,7 +89,9 @@ levelPicker.addEventListener("change", () => {
 });
 
 let game = new Simulation(config);
+let visibility = new VisibilityProjection(game, "player");
 const camera = new Camera2D(canvas.width, canvas.height);
+const view = new GameView(canvas, camera);
 camera.fit(config.nodes);
 let dragSource: string | null = null;
 let dragPoint: Point2D | null = null;
@@ -95,13 +100,19 @@ let lastFrame = performance.now();
 let accumulator = 0;
 let speedMultiplier = 1;
 let completionShown = false;
+let interdictArmed = false;
+let actionMessage: { text: string; until: number } | null = null;
 let nextAIDecisionAt = config.settings.rules.computerAI.decisionIntervalSeconds;
-const colors: Record<Owner, string> = { player: "#42c97a", enemy: "#ed5d62", neutral: "#8d9aa7" };
+interdictButton.hidden = !config.settings.rules.interdiction.enabled;
+interdictHelp.hidden = !config.settings.rules.interdiction.enabled;
 
 function resetLevel(): void {
   game = new Simulation(config);
+  visibility = new VisibilityProjection(game, "player");
   accumulator = 0;
   completionShown = false;
+  interdictArmed = false;
+  actionMessage = null;
   nextAIDecisionAt = config.settings.rules.computerAI.decisionIntervalSeconds;
   completionDialog.close();
 }
@@ -138,19 +149,7 @@ function toCanvas(event: MouseEvent): Point2D {
 }
 
 function nodeAt(point: Point2D): NodeState | undefined {
-  return [...game.nodes.values()].find((node) => {
-    const screen = camera.worldToScreen(node);
-    return Math.hypot(screen.x - point.x, screen.y - point.y) < 34;
-  });
-}
-
-function pointLineDistance(point: Point2D, a: Point2D, b: Point2D): number {
-  const dx = b.x - a.x;
-  const dy = b.y - a.y;
-  const lengthSquared = dx * dx + dy * dy;
-  if (lengthSquared === 0) return Math.hypot(point.x - a.x, point.y - a.y);
-  const t = Math.max(0, Math.min(1, ((point.x - a.x) * dx + (point.y - a.y) * dy) / lengthSquared));
-  return Math.hypot(point.x - (a.x + dx * t), point.y - (a.y + dy * t));
+  return view.nodeAt(game, visibility, point);
 }
 
 function canStartPlayerTransport(source: string, target: NodeState | undefined): boolean {
@@ -159,133 +158,8 @@ function canStartPlayerTransport(source: string, target: NodeState | undefined):
   return road !== undefined && !game.activeOnRoad(road.id);
 }
 
-function drawDirectionTriangle(a: Point2D, b: Point2D, t: number, color: string): void {
-  const x = a.x + (b.x - a.x) * t;
-  const y = a.y + (b.y - a.y) * t;
-  context.save();
-  context.translate(x, y);
-  context.rotate(Math.atan2(b.y - a.y, b.x - a.x));
-  context.fillStyle = color;
-  context.beginPath();
-  context.moveTo(9, 0);
-  context.lineTo(-6, -6);
-  context.lineTo(-6, 6);
-  context.closePath();
-  context.fill();
-  context.restore();
-}
-
-function drawRoad(road: RoadV2, transport: Transport | undefined, a: NodeState, b: NodeState): void {
-  const screenA = camera.worldToScreen(a);
-  const screenB = camera.worldToScreen(b);
-  context.lineWidth = transport ? Math.max(6, road.width * 5) : 2 + road.width * 2;
-  context.strokeStyle = transport ? colors[transport.owner] : "#536475";
-  context.globalAlpha = transport ? 0.82 : 0.8;
-  context.setLineDash(road.travelTimeMultiplier > 1 ? [10, 4 + road.travelTimeMultiplier * 3] : []);
-  context.beginPath(); context.moveTo(screenA.x, screenA.y); context.lineTo(screenB.x, screenB.y); context.stroke(); context.globalAlpha = 1;
-  context.setLineDash([]);
-  if (!transport) return;
-  const phase = game.time % 1;
-  for (let i = 0; i < 3; i++) drawDirectionTriangle(screenA, screenB, 0.14 + ((phase + i / 3) % 1) * 0.72, "#f7fbff");
-}
-
-function drawNodeShape(node: NodeState, x: number, y: number, radius: number): void {
-  context.beginPath();
-  if (node.kind === "base") {
-    for (let index = 0; index < 10; index++) {
-      const angle = -Math.PI / 2 + index * Math.PI / 5;
-      const distance = index % 2 === 0 ? radius : radius * 0.48;
-      const pointX = x + Math.cos(angle) * distance;
-      const pointY = y + Math.sin(angle) * distance;
-      if (index === 0) context.moveTo(pointX, pointY); else context.lineTo(pointX, pointY);
-    }
-    context.closePath();
-    return;
-  }
-  if (node.kind === "resource") {
-    const half = radius * 0.78;
-    context.rect(x - half, y - half, half * 2, half * 2);
-    return;
-  }
-  context.arc(x, y, radius, 0, Math.PI * 2);
-}
-
-function drawDragPreview(): void {
-  if (!dragSource || !dragPoint) return;
-  const source = camera.worldToScreen(game.node(dragSource));
-  const target = nodeAt(dragPoint);
-  const valid = canStartPlayerTransport(dragSource, target);
-  const color = valid ? colors.player : "#b9c5d0";
-  context.save();
-  context.setLineDash([9, 7]);
-  context.lineWidth = 4;
-  context.strokeStyle = color;
-  context.globalAlpha = 0.9;
-  context.beginPath();
-  context.moveTo(source.x, source.y);
-  context.lineTo(dragPoint.x, dragPoint.y);
-  context.stroke();
-  context.restore();
-  drawDirectionTriangle(source, dragPoint, 0.82, color);
-  if (valid && target) {
-    const targetScreen = camera.worldToScreen(target);
-    context.strokeStyle = color;
-    context.lineWidth = 4;
-    context.beginPath();
-    context.arc(targetScreen.x, targetScreen.y, 38, 0, Math.PI * 2);
-    context.stroke();
-  }
-}
-
-function isBesieged(node: NodeState): boolean {
-  const targeting = game.transports.filter((transport) => transport.active && transport.target === node.id);
-  return targeting.some((transport) => game.mode(transport) === "attack") && !targeting.some((transport) => game.mode(transport) === "support");
-}
-
-function drawNode(node: NodeState): void {
-  const screen = camera.worldToScreen(node);
-  if (isBesieged(node)) {
-    context.strokeStyle = "#ff334d";
-    context.lineWidth = 5;
-    context.beginPath();
-    context.arc(screen.x, screen.y, 40 + Math.sin(game.time * 5) * 2, 0, Math.PI * 2);
-    context.stroke();
-  }
-  context.fillStyle = colors[node.owner];
-  drawNodeShape(node, screen.x, screen.y, 31);
-  context.fill();
-  context.strokeStyle = node.kind === "base" ? "#fff" : node.kind === "resource" ? "#f0bd4f" : "#1a2530";
-  context.lineWidth = node.kind === "ordinary" ? 2 : 5;
-  context.stroke();
-  context.fillStyle = "#10151c";
-  context.font = "700 18px system-ui";
-  context.textAlign = "center";
-  context.fillText(String(Math.round(node.force)), screen.x, screen.y + 6);
-  context.fillStyle = "#dbe7ef";
-  context.font = "600 11px system-ui";
-  context.fillText(node.label, screen.x, screen.y + (node.kind === "ordinary" ? 51 : 62));
-  if (node.kind !== "ordinary") {
-    context.fillStyle = "#f0bd4f";
-    context.font = "700 11px system-ui";
-    context.fillText(node.kind === "resource" ? `+${node.production}/s` : "BASE", screen.x, screen.y - 43);
-  }
-}
-
 function render(): void {
-  context.clearRect(0, 0, canvas.width, canvas.height);
-  context.fillStyle = "#17212b";
-  context.fillRect(0, 0, canvas.width, canvas.height);
-  for (const road of game.roads.values()) {
-    const active = game.activeOnRoad(road.id);
-    drawRoad(road, active, active ? game.node(active.source) : game.node(road.a), active ? game.node(active.target) : game.node(road.b));
-  }
-  drawDragPreview();
-  for (const node of game.nodes.values()) drawNode(node);
-  context.fillStyle = "#b9c5d0";
-  context.font = "13px system-ui";
-  context.textAlign = "left";
-  const tickRate = 1 / config.settings.logicTickSeconds;
-  context.fillText(`Simulation ${game.time.toFixed(1)}s · ${tickRate.toFixed(0)} Hz${page.mode === "playtest" ? ` · ${speedMultiplier}×` : ""}`, 18, 28);
+  view.draw(game, visibility, dragSource, dragPoint, page.mode === "playtest" ? ` · ${speedMultiplier}×` : "");
   canvas.dataset.simulationTime = game.time.toFixed(2);
   canvas.dataset.levelId = page.level?.id ?? page.mode;
   canvas.dataset.cameraX = camera.centerX.toFixed(2);
@@ -294,6 +168,14 @@ function render(): void {
   canvas.dataset.playerNodes = String([...game.nodes.values()].filter((node) => node.owner === "player").length);
   canvas.dataset.enemyNodes = String([...game.nodes.values()].filter((node) => node.owner === "enemy").length);
   canvas.dataset.activeEnemyTransports = String(game.transports.filter((transport) => transport.active && transport.owner === "enemy").length);
+  canvas.dataset.visibleNodes = String([...game.nodes.keys()].filter((id) => visibility.nodeVisibility(id) === "visible").length);
+  canvas.dataset.discoveredNodes = String([...game.nodes.keys()].filter((id) => visibility.nodeVisibility(id) !== "unknown").length);
+  canvas.dataset.interdictionReadyIn = game.interdictionReadyIn("player").toFixed(1);
+  canvas.dataset.activeInterdictions = String(game.transports.filter((transport) => transport.active && !game.isTransportOperational(transport)).length);
+  const readyIn = game.interdictionReadyIn("player");
+  interdictButton.disabled = readyIn > 0 || game.winner !== null;
+  interdictButton.textContent = readyIn > 0 ? `Interdict · ${Math.ceil(readyIn)}s` : interdictArmed ? "Click an enemy route" : "Interdict route · ready";
+  interdictButton.setAttribute("aria-pressed", String(interdictArmed));
   const target = dragPoint ? nodeAt(dragPoint) : undefined;
   if (game.winner === "player" && successor && page.level) {
     status.textContent = `Victory — ${page.level.pickerLabel} complete. Continue to ${successor.pickerLabel}.`;
@@ -305,6 +187,8 @@ function render(): void {
     status.textContent = "Defeat — Eastern Command captured your base.";
   } else if (game.winner === "player") {
     status.textContent = "Victory — the enemy base surrendered.";
+  } else if (actionMessage && game.time < actionMessage.until) {
+    status.textContent = actionMessage.text;
   } else if (dragSource && canStartPlayerTransport(dragSource, target)) {
     status.textContent = `Release to send forces to ${target!.label}.`;
   } else if (dragSource) {
@@ -320,6 +204,7 @@ function frame(now: number): void {
   lastFrame = now;
   while (accumulator >= config.settings.logicTickSeconds) {
     game.step();
+    visibility.update(game);
     if (config.settings.rules.computerAI.enabled && !game.winner && game.time >= nextAIDecisionAt) {
       applyAICommand(game, chooseAICommand(createAIObservation(game, "enemy")), "enemy");
       nextAIDecisionAt += config.settings.rules.computerAI.decisionIntervalSeconds;
@@ -335,9 +220,29 @@ speedInput.addEventListener("input", () => {
   speedValue.value = `${speedMultiplier}×`;
 });
 
+function visibleEnemyTransportAt(point: Point2D): Transport | undefined {
+  return view.transportAt(game, visibility, point, (transport) => transport.owner === "enemy" && game.isTransportOperational(transport));
+}
+
+interdictButton.addEventListener("click", () => {
+  if (game.interdictionReadyIn("player") > 0 || game.winner) return;
+  interdictArmed = !interdictArmed;
+  actionMessage = { text: interdictArmed ? "Click a visible red route to suspend it." : "Interdiction targeting canceled.", until: game.time + 3 };
+});
+
 canvas.addEventListener("pointerdown", (event) => {
   if (event.button !== 0) return;
   const point = toCanvas(event);
+  if (interdictArmed) {
+    const transport = visibleEnemyTransportAt(point);
+    if (transport && game.interdictTransport(transport.id, "player")) {
+      interdictArmed = false;
+      actionMessage = { text: `Interdicted ${game.node(transport.source).label} → ${game.node(transport.target).label}. Its support and dispatch are suspended.`, until: game.time + 5 };
+    } else {
+      actionMessage = { text: "Choose a visible, active red route. Allied, hidden, and already disrupted routes are invalid.", until: game.time + 4 };
+    }
+    return;
+  }
   const node = nodeAt(point);
   if (node?.owner === "player") {
     dragSource = node.id;
@@ -386,14 +291,8 @@ canvas.addEventListener("pointercancel", (event) => {
 canvas.addEventListener("contextmenu", (event) => {
   event.preventDefault();
   const point = toCanvas(event);
-  for (const transport of game.transports.filter((candidate) => candidate.active && candidate.owner === "player")) {
-    const a = camera.worldToScreen(game.node(transport.source));
-    const b = camera.worldToScreen(game.node(transport.target));
-    if (pointLineDistance(point, a, b) < 16) {
-      game.cancelTransport(transport.id);
-      break;
-    }
-  }
+  const transport = view.transportAt(game, visibility, point, (candidate) => candidate.owner === "player");
+  if (transport) game.cancelTransport(transport.id);
 });
 
 canvas.addEventListener("wheel", (event) => {

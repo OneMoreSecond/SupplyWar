@@ -5,12 +5,12 @@
     "siegeFormula": "exponential-half-life",
     "siegeHalfLifeSeconds": 25,
     "secondsPerDistanceUnit": 0.004,
-    "forcePerWidthUnit": 1.5,
+    "forcePerWidthUnit": 4,
     "rules": {
       "siegeSupport": "rooted",
       "computerAI": { "enabled": true, "decisionIntervalSeconds": 1, "reserveForce": 10 },
-      "fogOfWar": { "enabled": false },
-      "interdiction": { "enabled": false, "durationSeconds": 10, "cooldownSeconds": 60 }
+      "fogOfWar": { "enabled": true },
+      "interdiction": { "enabled": true, "durationSeconds": 10, "cooldownSeconds": 60 }
     }
   },
   "nodes": [

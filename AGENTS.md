@@ -15,7 +15,7 @@ Road crossings are allowed by the game and editor. Avoiding crossings is a map-d
 
 Source: user-confirmed MVP review, 2026-08-26; tutorial-progression goal, 2026-08-27; and approved Demo plan, 2026-08-28.
 
-Normal play contains four focused tutorial maps, `maps/mvp.json` as their final exam, and the in-progress large-map baseline `maps/demo.json`. The Demo currently has deterministic enemy AI and full visibility; its fog, Interdiction, visual refinement, and human fun/pacing gates remain pending. Source: user-approved plan, `src/levels.ts`, `maps/demo.json`, and `agents/progress/2026-08-28-demo-plan.md`, 2026-08-28.
+Normal play contains four focused tutorial maps, `maps/mvp.json` as their final exam, and the large-map `maps/demo.json`. The Demo has deterministic fog-limited AI, fog with discovery memory, player/AI Interdiction, semantic node/road presentation, and locally bundled Barlow. Human fun and 10–15-minute pacing remain unverified. Source: user-approved plan and follow-up, `src/levels.ts`, `maps/demo.json`, and `agents/progress/2026-08-28-demo-plan.md`, 2026-08-28.
 
 The current mechanics, maps, architecture, validation, and remaining Demo risks are maintained in the [formal prototype documentation set](doc/mvp/README.md).
 
@@ -28,3 +28,5 @@ When a shell search pattern contains Markdown backticks, wrap the pattern in sin
 ## Browser checks
 
 `editor.html` places `.editor-header` beside `main.editor-layout`, not inside it. Page-wide editor text assertions should query `body`; reserve `main` for preview/form content. Source: agent browser-test mistake, 2026-08-28.
+
+Use exact accessible-label matching when one editor label prefixes others, such as `Interdiction`, `Interdiction duration`, and `Interdiction cooldown`. Source: agent browser-test mistake, 2026-08-28.

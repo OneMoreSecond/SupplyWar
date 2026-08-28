@@ -423,7 +423,7 @@ function drawPreview(): void {
     context.lineWidth = node.kind === "ordinary" ? 2 : 4;
     context.stroke();
     context.fillStyle = "#e6edf3";
-    context.font = "600 13px system-ui";
+    context.font = "600 13px Barlow, system-ui";
     context.textAlign = "center";
     context.fillText(node.label || node.id || "Untitled", screen.x, screen.y + 42);
 

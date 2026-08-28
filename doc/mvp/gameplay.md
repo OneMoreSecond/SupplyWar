@@ -1,6 +1,6 @@
 # Supply War Gameplay
 
-Status: rooted-supply rules and deterministic Demo AI are implemented; fog and Interdiction remain disabled.
+Status: rooted supply, fog of war, deterministic fog-limited AI, and timed Interdiction are implemented in the Demo.
 
 Source: user-confirmed MVP decisions in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), tutorial sequencing in [the tutorial progress record](../../agents/progress/2026-08-27-tutorial-level-progression.md), the approved requirements in [`doc/Demo.md`](../Demo.md), and current implementation recorded in [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md), updated 2026-08-28.
 
@@ -10,9 +10,10 @@ Capture the enemy base before the enemy captures the player base. Tutorials intr
 
 1. Start transports from owned nodes across unused adjacent roads.
 2. Capture neutral nodes and sparse resource nodes to expand production.
-3. Reinforce threatened holdings and cut hostile support roots.
-4. Attack unsupported ordinary nodes with siege; capture bases and resources through arriving force.
-5. Capture `enemy-base` to win while protecting `player-base`. Source: current rules in [`src/game.ts`](../../src/game.ts) and Demo goal in [`doc/Demo.md`](../Demo.md).
+3. Reveal adjacent territory, reinforce threatened holdings, and cut hostile support roots.
+4. Interdict a visible hostile route to suspend its dispatch and support during a configured window.
+5. Attack unsupported ordinary nodes with siege; capture bases and resources through arriving force.
+6. Capture `enemy-base` to win while protecting `player-base`. Source: current rules in [`src/game.ts`](../../src/game.ts) and Demo goal in [`doc/Demo.md`](../Demo.md).
 
 ## Terms
 
@@ -25,6 +26,8 @@ Capture the enemy base before the enemy captures the player base. Tutorials intr
 | Supply root | A player- or enemy-owned base or resource | Approved rule in [`doc/Demo.md`](../Demo.md); implementation in [`src/game.ts`](../../src/game.ts) |
 | Rooted support | A directed chain of active same-owner support transports starting at a supply root | Approved rule in [`doc/Demo.md`](../Demo.md); implementation in [`src/game.ts`](../../src/game.ts) |
 | Siege | Exponential attrition applied to an attacked ordinary node without valid supply | [`src/game.ts`](../../src/game.ts) |
+| Fog | Live state for owned nodes and their immediate neighbors; discovered geography remains without current owner/force | [`src/visibility.ts`](../../src/visibility.ts), [`src/game-view.ts`](../../src/game-view.ts) |
+| Interdiction | A timed suspension of one visible hostile route; the route remains occupied while dispatch and support stop | [`src/game.ts`](../../src/game.ts), [`src/main.ts`](../../src/main.ts) |
 
 ## Transport and economy rules
 
@@ -39,6 +42,7 @@ Capture the enemy base before the enemy captures the player base. Tutorials intr
 | Cancel | The owning side may cancel an active transport; all in-flight force on it is removed | [`src/game.ts`](../../src/game.ts) |
 | Source capture | Cancels that source's transports and removes their packets | [`src/game.ts`](../../src/game.ts) |
 | Target capture | Keeps the transport and re-evaluates support/attack mode on the next tick | [`src/game.ts`](../../src/game.ts) |
+| Interdicted route | Keeps already-dispatched packets, pauses new dispatch, and does not count as attack/support until its timer ends | [`src/game.ts`](../../src/game.ts), [`test/game.test.ts`](../../test/game.test.ts) |
 
 ## Rooted siege
 
@@ -52,6 +56,6 @@ At force `<= 0.01`, it surrenders to the active attacker with a zero-force garri
 
 ## Computer AI
 
-The Demo enables one deterministic enemy policy. Every configured decision interval it issues at most one normal game command. It first cancels a route that would drain its source below reserve, then defends a threatened holding, targets an affordable resource, attacks an affordable weak unsupported hostile node, expands into an affordable neutral node, or attacks another affordable hostile node. IDs resolve ties deterministically. Source: [`src/ai.ts`](../../src/ai.ts), [`src/main.ts`](../../src/main.ts), and [`test/ai.test.ts`](../../test/ai.test.ts).
+The Demo enables one deterministic enemy policy. Every configured decision interval it issues at most one normal game command from its currently visible nodes/roads. It cancels a route below reserve, Interdicts a visible hostile attack when ready, then defends, targets an affordable resource, attacks an affordable weak unsupported hostile, expands, or attacks another affordable hostile. IDs resolve ties deterministically. Source: [`src/ai.ts`](../../src/ai.ts), [`src/visibility.ts`](../../src/visibility.ts), [`src/main.ts`](../../src/main.ts), and [`test/ai.test.ts`](../../test/ai.test.ts).
 
-The four tutorials and MVP final exam keep AI disabled. Fog of war and Interdiction are represented in the version-2 schema but validation rejects enabling them until their implementation phases are complete. Source: authored JSON under [`maps/`](../../maps/), validator in [`src/game.ts`](../../src/game.ts), and pending work in [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md).
+The four tutorials and MVP final exam keep AI, fog, and Interdiction disabled; the Demo enables all three. Player and AI Interdiction share the same simulation command, configured duration, and per-owner cooldown. Source: authored JSON under [`maps/`](../../maps/), [`src/game.ts`](../../src/game.ts), and [`src/ai.ts`](../../src/ai.ts).

@@ -81,4 +81,27 @@ describe("computer AI", () => {
 
     expect(chooseAICommand(createAIObservation(game, "enemy"))).toEqual({ type: "wait" });
   });
+
+  it("interdicts a visible hostile attack before issuing a transport command", () => {
+    const map = aiMap();
+    map.settings.rules.interdiction.enabled = true;
+    const game = new Simulation(map);
+    const attack = game.startTransport("player-outpost", "enemy-outpost", "player")!;
+
+    const command = chooseAICommand(createAIObservation(game, "enemy"));
+    expect(command).toEqual({ type: "interdict-transport", transportId: attack.id });
+    expect(applyAICommand(game, command, "enemy")).toBe(true);
+    expect(game.isTransportOperational(attack)).toBe(false);
+  });
+
+  it("does not expose nodes beyond the AI's fog boundary", () => {
+    const map = aiMap();
+    map.settings.rules.fogOfWar.enabled = true;
+    map.nodes.push({ id: "hidden", label: "Hidden", owner: "neutral", force: 1, production: 0, kind: "ordinary", x: 500, y: 100 });
+    map.roads.push({ id: "neutral-hidden", a: "neutral-node", b: "hidden", width: 1, travelTimeMultiplier: 1 });
+    const observation = createAIObservation(new Simulation(map), "enemy");
+
+    expect(observation.nodes.some((node) => node.id === "hidden")).toBe(false);
+    expect(observation.roads.some((road) => road.id === "neutral-hidden")).toBe(false);
+  });
 });

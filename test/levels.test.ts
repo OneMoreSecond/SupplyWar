@@ -99,26 +99,36 @@ describe("authored level catalog", () => {
     expect(game.time).toBeLessThan(11.2);
   });
 
-  it("teaches siege by letting a weak force defeat a stronger unsupported base", () => {
+  it("teaches rooted siege by cutting a weak middle node through a shortcut", () => {
     const level = levelById("siege");
     const game = new Simulation(level.config);
-    const sideNodes = [game.node("north-flank"), game.node("south-flank")];
-    expect(sideNodes.every((node) => node.owner === "player")).toBe(true);
-    expect(sideNodes.every((node) => game.roadBetween(node.id, "fortress"))).toBe(true);
-    const playerForce = [game.node("player-base"), ...sideNodes]
-      .reduce((total, node) => total + node.force, 0);
-    expect(playerForce).toBeLessThan(game.node("fortress").force / 5);
-    expect(game.startTransport("player-base", "fortress", "player")).not.toBeNull();
-    expect(game.startTransport("north-flank", "fortress", "player")).not.toBeNull();
-    expect(game.startTransport("south-flank", "fortress", "player")).not.toBeNull();
-    runUntil(game, () => game.node("fortress").owner === "player", 60);
-    expect(game.node("fortress").owner).toBe("player");
-    expect(game.startTransport("fortress", "enemy-base", "player")).not.toBeNull();
+    expect(level.config.nodes.map((node) => node.id)).toEqual([
+      "player-base",
+      "frontline",
+      "mid",
+      "enemy-base",
+    ]);
+    expect(game.roadBetween("player-base", "frontline")).toBeDefined();
+    expect(game.roadBetween("frontline", "mid")).toBeDefined();
+    expect(game.roadBetween("mid", "enemy-base")).toBeDefined();
+    expect(game.roadBetween("player-base", "mid")).toBeDefined();
+    expect(game.node("frontline").force).toBeGreaterThan(game.node("mid").force * 5);
+    expect(game.isSupplied("frontline")).toBe(true);
+
+    expect(game.startTransport("player-base", "mid", "player")).not.toBeNull();
+    runUntil(game, () => game.node("mid").owner === "player", 30);
+    expect(game.node("mid").owner).toBe("player");
+    expect(game.isSupplied("frontline")).toBe(false);
+
+    expect(game.startTransport("player-base", "frontline", "player")).not.toBeNull();
+    runUntil(game, () => game.node("frontline").owner === "player", 60);
+    expect(game.node("frontline").owner).toBe("player");
+    expect(game.startTransport("mid", "enemy-base", "player")).not.toBeNull();
     runUntil(game, () => game.winner === "player", 60);
 
     expect(game.winner).toBe("player");
-    expect(game.time).toBeGreaterThan(8);
-    expect(game.time).toBeLessThan(12);
+    expect(game.time).toBeGreaterThan(10);
+    expect(game.time).toBeLessThan(25);
   });
 
   it("halves the MVP final-exam completion time through map numbers", () => {
@@ -155,9 +165,15 @@ describe("authored level catalog", () => {
     expect(new Set(config.roads.map((road) => road.width)).size).toBeGreaterThanOrEqual(4);
     expect(config.roads.some((road) => road.travelTimeMultiplier > 1)).toBe(true);
     expect(config.nodes.filter((node) => node.kind === "ordinary").every((node) => node.production === 0)).toBe(true);
+    for (const resource of config.nodes.filter((node) => node.kind === "resource")) {
+      const bestCapacity = Math.max(...config.roads
+        .filter((road) => road.a === resource.id || road.b === resource.id)
+        .map((road) => road.width * config.settings.forcePerWidthUnit));
+      expect(bestCapacity).toBeGreaterThanOrEqual(resource.production * 1.5);
+    }
     expect(config.settings.rules.computerAI.enabled).toBe(true);
-    expect(config.settings.rules.fogOfWar.enabled).toBe(false);
-    expect(config.settings.rules.interdiction.enabled).toBe(false);
+    expect(config.settings.rules.fogOfWar.enabled).toBe(true);
+    expect(config.settings.rules.interdiction.enabled).toBe(true);
 
     const game = new Simulation(config);
     const initialEnemyNodes = [...game.nodes.values()].filter((node) => node.owner === "enemy").length;
@@ -171,5 +187,28 @@ describe("authored level catalog", () => {
     }
 
     expect([...game.nodes.values()].filter((node) => node.owner === "enemy").length).toBeGreaterThan(initialEnemyNodes);
+  });
+
+  it("does not leave a symmetric automated Demo match permanently stalled", () => {
+    const config = levelById("demo").config;
+    if (config.version !== 2) throw new Error("The Demo must use map schema version 2");
+    const game = new Simulation(config);
+    let nextDecisionAt = config.settings.rules.computerAI.decisionIntervalSeconds;
+    let ownershipChanges = 0;
+    let previousOwners = new Map([...game.nodes].map(([id, node]) => [id, node.owner]));
+    for (let index = 0; index < 9000 && !game.winner; index++) {
+      game.step();
+      for (const owner of ["player", "enemy"] as const) {
+        if (game.time >= nextDecisionAt) applyAICommand(game, chooseAICommand(createAIObservation(game, owner)), owner);
+      }
+      if (game.time >= nextDecisionAt) nextDecisionAt += config.settings.rules.computerAI.decisionIntervalSeconds;
+      const currentOwners = new Map([...game.nodes].map(([id, node]) => [id, node.owner]));
+      for (const [id, owner] of currentOwners) if (owner !== previousOwners.get(id)) ownershipChanges++;
+      previousOwners = currentOwners;
+    }
+
+    expect(ownershipChanges).toBeGreaterThanOrEqual(10);
+    expect(game.winner).not.toBeNull();
+    expect(game.time).toBeLessThan(900);
   });
 });

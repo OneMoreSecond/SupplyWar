@@ -196,13 +196,10 @@ describe("Map validation", () => {
     delete missingTravelMultiplier.roads[0]!.travelTimeMultiplier;
     expect(() => validateMap(missingTravelMultiplier)).toThrow('Road "attack-frontline" travelTimeMultiplier must be a number greater than or equal to 1');
 
-    const unsupportedFog = rootedConfig();
-    unsupportedFog.settings.rules.fogOfWar.enabled = true;
-    expect(() => validateMap(unsupportedFog)).toThrow("Fog of war is not implemented yet; fogOfWar enabled must be false");
-
-    const unsupportedInterdiction = rootedConfig();
-    unsupportedInterdiction.settings.rules.interdiction.enabled = true;
-    expect(() => validateMap(unsupportedInterdiction)).toThrow("Interdiction is not implemented yet; interdiction enabled must be false");
+    const enabledRules = rootedConfig();
+    enabledRules.settings.rules.fogOfWar.enabled = true;
+    enabledRules.settings.rules.interdiction.enabled = true;
+    expect(() => validateMap(enabledRules)).not.toThrow();
   });
 
   it("applies a version 2 road travel multiplier without changing throughput", () => {
@@ -275,5 +272,63 @@ describe("rooted supply siege", () => {
 
     expect(game.node("frontline").force).toBeCloseTo(50, 1);
     expect(game.transports.find((transport) => transport.source === "enemy-resource")?.active).toBe(false);
+  });
+});
+
+describe("Interdiction", () => {
+  function interdictionGame(): Simulation {
+    const map = rootedConfig();
+    map.settings.rules.interdiction = { enabled: true, durationSeconds: 2, cooldownSeconds: 5 };
+    map.nodes.find((node) => node.id === "enemy-resource")!.force = 20;
+    map.initialTransports.push({ source: "enemy-resource", target: "frontline", owner: "enemy" });
+    return new Simulation(map);
+  }
+
+  it("temporarily pauses dispatch and rooted support", () => {
+    const game = interdictionGame();
+    const support = game.transports[0]!;
+    expect(game.isSupplied("frontline")).toBe(true);
+
+    expect(game.interdictTransport(support.id, "player")).toBe(true);
+    expect(game.isTransportOperational(support)).toBe(false);
+    expect(game.isSupplied("frontline")).toBe(false);
+    const sourceForce = game.node("enemy-resource").force;
+    game.step(1);
+    expect(game.node("enemy-resource").force).toBe(sourceForce);
+
+    game.step(1);
+    expect(game.isTransportOperational(support)).toBe(true);
+    expect(game.isSupplied("frontline")).toBe(true);
+    expect(game.node("enemy-resource").force).toBeLessThan(sourceForce);
+  });
+
+  it("preserves packets already in flight", () => {
+    const game = interdictionGame();
+    const support = game.transports[0]!;
+    game.step();
+    expect(support.packets.length).toBeGreaterThan(0);
+    const frontlineForce = game.node("frontline").force;
+
+    expect(game.interdictTransport(support.id, "player")).toBe(true);
+    game.step(3);
+
+    expect(game.node("frontline").force).toBeGreaterThan(frontlineForce);
+  });
+
+  it("enforces ownership, feature, active-target, and cooldown rules", () => {
+    const game = interdictionGame();
+    const support = game.transports[0]!;
+    expect(game.interdictTransport(support.id, "enemy")).toBe(false);
+    expect(game.interdictTransport("missing", "player")).toBe(false);
+    expect(game.interdictTransport(support.id, "player")).toBe(true);
+    expect(game.interdictTransport(support.id, "player")).toBe(false);
+    expect(game.interdictionReadyIn("player")).toBe(5);
+    game.step(5);
+    expect(game.interdictionReadyIn("player")).toBe(0);
+    expect(game.interdictTransport(support.id, "player")).toBe(true);
+
+    const disabled = new Simulation(rootedConfig());
+    const route = disabled.startTransport("enemy-resource", "frontline", "enemy")!;
+    expect(disabled.interdictTransport(route.id, "player")).toBe(false);
   });
 });

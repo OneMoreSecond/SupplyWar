@@ -1,6 +1,6 @@
 # Supply War Prototype
 
-Status: MVP implemented; large-map Demo baseline implemented; qualitative Gate C pending.
+Status: MVP and automated Demo implementation complete; qualitative human validation pending.
 
 Source: user-confirmed MVP decisions and evidence in [the game progress record](../../agents/progress/2026-08-26-game-demo-plan-grill.md), [the map-editor progress record](../../agents/progress/2026-08-27-browser-map-editor.md), [the tutorial progression record](../../agents/progress/2026-08-27-tutorial-level-progression.md), and the approved implementation in [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md), updated 2026-08-28. These category documents hold current truth; progress records and histories retain superseded decisions.
 
@@ -16,4 +16,4 @@ Source: user-confirmed MVP decisions and evidence in [the game progress record](
 
 ## Scope boundary
 
-The maintained progression teaches four mechanisms, tests them in the MVP final exam, then exposes the 32-node Central Campaign baseline. Version-2 maps add rooted supply, explicit road travel multipliers, and deterministic AI settings; version-1 maps remain loadable with legacy direct-support siege. Fog of war and Interdiction fields are reserved but must remain disabled until their phases are implemented. Human 10–15-minute pacing and fun are not yet validated. Source: [Gameplay](gameplay.md), [Technology](tech.md), [Validation](validation.md), and [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md).
+The maintained progression teaches four mechanisms, tests them in the MVP final exam, then exposes the 32-node Central Campaign with rooted supply, fog/discovery, deterministic fog-limited AI, road latency, and timed player/AI Interdiction. Version-1 maps remain loadable with legacy direct-support siege. Human 10–15-minute pacing and fun are not yet validated. Source: [Gameplay](gameplay.md), [Technology](tech.md), [Validation](validation.md), and [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md).

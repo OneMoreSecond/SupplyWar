@@ -1,6 +1,6 @@
 # Supply War Technology
 
-Status: schema version 2, rooted supply, deterministic AI, and the large-map baseline are implemented. Fog, Interdiction, and the planned game-view extraction are pending.
+Status: schema version 2, rooted supply, fog projection, deterministic AI, Interdiction, and the extracted game view are implemented.
 
 Source: current repository implementation and [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md), updated 2026-08-28.
 
@@ -9,8 +9,10 @@ Source: current repository implementation and [the Demo progress record](../../a
 | Component | Responsibility | Primary location | Source |
 | --- | --- | --- | --- |
 | Game shell | Level picker, guidance, completion dialog, editor entry, canvas, and restart | [`index.html`](../../index.html) | Current HTML |
-| Orchestration/view | Level routing, fixed-step accumulation, AI cadence, Canvas drawing, input, and completion state | [`src/main.ts`](../../src/main.ts) | Current implementation |
-| Simulation | Validation/upgrade boundary, force, transports, rooted supply, siege, and victory | [`src/game.ts`](../../src/game.ts) | Current implementation |
+| Browser orchestration | Level routing, fixed-step accumulation, AI cadence, ability/HUD state, and completion state | [`src/main.ts`](../../src/main.ts) | Current implementation |
+| Game view | Fog-aware Canvas drawing and node/route hit testing | [`src/game-view.ts`](../../src/game-view.ts) | Current implementation |
+| Visibility | Current visibility plus persistent discovered-node projection | [`src/visibility.ts`](../../src/visibility.ts) | Current implementation |
+| Simulation | Validation/upgrade boundary, force, transports, rooted supply, siege, Interdiction timers/cooldowns, and victory | [`src/game.ts`](../../src/game.ts) | Current implementation |
 | AI policy | Immutable observation, deterministic command choice, and normal command application | [`src/ai.ts`](../../src/ai.ts) | Current implementation |
 | Level catalog | Four tutorials, MVP final exam, and Demo metadata/configs | [`src/levels.ts`](../../src/levels.ts) | Current implementation |
 | Camera | Shared world/screen transforms, pan, zoom, and fit | [`src/camera.ts`](../../src/camera.ts) | Current implementation |
@@ -33,15 +35,15 @@ Each step produces force, delivers due packets, cancels transports whose sources
 
 `validateMap` strictly validates either external version. `upgradeMap` clones version 2 unchanged or explicitly upgrades version 1 with `travelTimeMultiplier: 1`, disabled feature rules, and `siegeSupport: "direct"`. `Simulation` consumes only the normalized version-2 runtime type. This preserves old behavior without scattering optional defaults through the engine. Source: [`src/game.ts`](../../src/game.ts) and versioning tests in [`test/game.test.ts`](../../test/game.test.ts).
 
-Version-2 fog and Interdiction configuration is present so authored data has a stable future seam, but validation currently rejects `enabled: true`; no valid map can silently request unimplemented behavior. Source: [`src/game.ts`](../../src/game.ts) and [`test/game.test.ts`](../../test/game.test.ts).
+Version-2 fog and Interdiction settings are fully authorable and validated; the Demo enables both while the other maintained maps disable them. Source: [`src/game.ts`](../../src/game.ts), [`src/editor.ts`](../../src/editor.ts), authored JSON, and [`test/game.test.ts`](../../test/game.test.ts).
 
 ## Rooted supply algorithm
 
-For each player/enemy owner, the simulation starts reachability at owned base/resource nodes and repeatedly follows active same-owner transports currently in support mode. Siege checks the attacked node against that reachable set. The bounded graph traversal handles branches and cycles without a separate supply object model. Source: [`src/game.ts`](../../src/game.ts); root, multi-hop, isolated-cycle, rooted-cycle, and root-capture tests in [`test/game.test.ts`](../../test/game.test.ts).
+For each player/enemy owner, the simulation starts reachability at owned base/resource nodes and repeatedly follows operational same-owner transports currently in support mode. Interdicted routes leave this graph until their timer ends. Siege checks the attacked node against that reachable set. Source: [`src/game.ts`](../../src/game.ts); rooted-supply and Interdiction tests in [`test/game.test.ts`](../../test/game.test.ts).
 
 ## AI boundary
 
-`createAIObservation` copies only tactical node, road, transport, supply, threat, and reserve facts. `chooseAICommand` is pure and returns start, cancel, or wait; `applyAICommand` uses the same `Simulation` methods as player input. Stable ID ordering resolves equal choices. Source: [`src/ai.ts`](../../src/ai.ts) and [`test/ai.test.ts`](../../test/ai.test.ts).
+`createAIObservation` copies only fog-visible tactical node, road, transport, supply, threat, reserve, and cooldown facts. `chooseAICommand` is pure and returns start, cancel, Interdict, or wait; `applyAICommand` uses the same `Simulation` methods as player input. Stable ID ordering resolves equal choices. Source: [`src/ai.ts`](../../src/ai.ts), [`src/visibility.ts`](../../src/visibility.ts), and [`test/ai.test.ts`](../../test/ai.test.ts).
 
 The implementation intentionally has no behavior tree, path planner, direct force mutation, event bus, difficulty system, or randomness. Source: approved simplicity decision in [the Demo progress record](../../agents/progress/2026-08-28-demo-plan.md).
 
@@ -53,7 +55,5 @@ The existing selection, connector-drag roads, node movement, unbounded camera, J
 
 ## Deferred technical work
 
-- Gate C human play, including confirmation that animated routes remain legible, before hiding information. Source: refreshed production screenshot and Demo plan.
-- `src/visibility.ts`, fog-aware drawing/hit testing, and discovered-state memory. Source: pending Phase D in the Demo progress record.
-- Simulation-owned Interdiction timers/cooldowns and player/AI commands. Source: pending Phase D in the Demo progress record.
-- Cohesive game-view extraction, node shapes, road styles, HUD, and bundled font. Source: pending Phase E in the Demo progress record.
+- Tune map JSON and AI weights from human sessions without changing core formulas solely to hit duration. Source: Gate F in the Demo progress record.
+- Add broader browser automation only when human findings identify a missing behavior; current changed surfaces already have focused coverage. Source: simplicity constraint in [`AGENTS.md`](../../AGENTS.md) and current validation evidence.

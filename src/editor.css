@@ -1,4 +1,5 @@
-:root { color-scheme: dark; font-family: Inter, ui-sans-serif, system-ui, sans-serif; background: #10151c; color: #e6edf3; }
+@import "./fonts.css";
+:root { color-scheme: dark; font-family: Barlow, ui-sans-serif, system-ui, sans-serif; background: #10151c; color: #e6edf3; }
 * { box-sizing: border-box; }
 body { margin: 0; min-width: 320px; }
 button, .button { border: 1px solid #5c6c7e; border-radius: 7px; background: #1c2734; color: inherit; padding: 9px 13px; cursor: pointer; font: inherit; text-decoration: none; }

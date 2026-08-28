@@ -1,4 +1,5 @@
 import { type NodeKind, type Owner, type Simulation } from "./game";
+import { currentlyVisibleNodeIds } from "./visibility";
 
 interface AINodeObservation {
   readonly id: string;
@@ -19,13 +20,18 @@ interface AIRoadObservation {
 interface AITransportObservation {
   readonly id: string;
   readonly source: string;
+  readonly target: string;
   readonly owner: Owner;
   readonly active: boolean;
+  readonly interdicted: boolean;
+  readonly visible: boolean;
 }
 
 export interface AIObservation {
   readonly owner: Owner;
   readonly reserveForce: number;
+  readonly interdictionEnabled: boolean;
+  readonly interdictionReady: boolean;
   readonly nodes: readonly AINodeObservation[];
   readonly roads: readonly AIRoadObservation[];
   readonly transports: readonly AITransportObservation[];
@@ -34,6 +40,7 @@ export interface AIObservation {
 export type AICommand =
   | { readonly type: "start-transport"; readonly source: string; readonly target: string }
   | { readonly type: "cancel-transport"; readonly transportId: string }
+  | { readonly type: "interdict-transport"; readonly transportId: string }
   | { readonly type: "wait" };
 
 interface StartCandidate {
@@ -43,7 +50,8 @@ interface StartCandidate {
 }
 
 export function createAIObservation(game: Simulation, owner: Owner): AIObservation {
-  const active = game.transports.filter((transport) => transport.active);
+  const visible = currentlyVisibleNodeIds(game, owner);
+  const active = game.transports.filter((transport) => transport.active && visible.has(transport.source) && visible.has(transport.target));
   const threatened = new Set(
     active
       .filter((transport) => transport.owner !== owner && game.mode(transport) === "attack")
@@ -52,7 +60,9 @@ export function createAIObservation(game: Simulation, owner: Owner): AIObservati
   return {
     owner,
     reserveForce: game.config.settings.rules.computerAI.reserveForce,
-    nodes: [...game.nodes.values()].map((node) => ({
+    interdictionEnabled: game.config.settings.rules.interdiction.enabled,
+    interdictionReady: owner !== "neutral" && game.interdictionReadyIn(owner) === 0,
+    nodes: [...game.nodes.values()].filter((node) => visible.has(node.id)).map((node) => ({
       id: node.id,
       owner: node.owner,
       force: node.force,
@@ -60,8 +70,18 @@ export function createAIObservation(game: Simulation, owner: Owner): AIObservati
       supplied: game.isSupplied(node.id),
       threatened: threatened.has(node.id),
     })),
-    roads: [...game.roads.values()].map((road) => ({ id: road.id, a: road.a, b: road.b, occupied: game.activeOnRoad(road.id) !== undefined })),
-    transports: active.map((transport) => ({ id: transport.id, source: transport.source, owner: transport.owner, active: transport.active })),
+    roads: [...game.roads.values()]
+      .filter((road) => visible.has(road.a) && visible.has(road.b))
+      .map((road) => ({ id: road.id, a: road.a, b: road.b, occupied: game.activeOnRoad(road.id) !== undefined })),
+    transports: active.map((transport) => ({
+      id: transport.id,
+      source: transport.source,
+      target: transport.target,
+      owner: transport.owner,
+      active: transport.active,
+      interdicted: !game.isTransportOperational(transport),
+      visible: visible.has(transport.source) && visible.has(transport.target),
+    })),
   };
 }
 
@@ -94,6 +114,13 @@ export function chooseAICommand(observation: AIObservation): AICommand {
     .sort((left, right) => left.id.localeCompare(right.id))[0];
   if (cancel) return { type: "cancel-transport", transportId: cancel.id };
 
+  const interdict = observation.interdictionEnabled && observation.interdictionReady
+    ? observation.transports
+      .filter((transport) => transport.owner !== observation.owner && transport.visible && !transport.interdicted && nodes.get(transport.target)!.owner === observation.owner)
+      .sort((left, right) => left.id.localeCompare(right.id))[0]
+    : undefined;
+  if (interdict) return { type: "interdict-transport", transportId: interdict.id };
+
   const candidates = startCandidates(observation);
   const defense = candidates.find((candidate) => candidate.target.owner === observation.owner && candidate.target.threatened);
   if (defense) return start(defense);
@@ -114,5 +141,6 @@ export function chooseAICommand(observation: AIObservation): AICommand {
 export function applyAICommand(game: Simulation, command: AICommand, owner: Owner): boolean {
   if (command.type === "start-transport") return game.startTransport(command.source, command.target, owner) !== null;
   if (command.type === "cancel-transport") return game.cancelTransport(command.transportId, owner);
+  if (command.type === "interdict-transport" && owner !== "neutral") return game.interdictTransport(command.transportId, owner);
   return false;
 }

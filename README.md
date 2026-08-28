@@ -1,6 +1,6 @@
 # Supply War
 
-Browser prototype for a supply-route strategy game. Four focused tutorials teach transport, allied supply, supply cutting, and siege; the original MVP map is their final exam; and the large Central Campaign baseline adds deterministic enemy expansion across 32 nodes. Source: [`src/levels.ts`](src/levels.ts), [`maps/demo.json`](maps/demo.json), and [the Demo progress record](agents/progress/2026-08-28-demo-plan.md).
+Browser prototype for a supply-route strategy game. Four focused tutorials teach transport, allied supply, supply cutting, and rooted siege; the original MVP map is their final exam; and the 32-node Central Campaign adds fog of war, deterministic enemy expansion, and timed route Interdiction. Source: [`src/levels.ts`](src/levels.ts), [`maps/demo.json`](maps/demo.json), and [the Demo progress record](agents/progress/2026-08-28-demo-plan.md).
 
 The main page starts at Tutorial 1. Use the `Level` picker to open any map; winning opens a congratulation dialog with replay and next-level actions, or a close action after the Demo. Source: [`index.html`](index.html), [`src/levels.ts`](src/levels.ts), and [`src/main.ts`](src/main.ts).
 

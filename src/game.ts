@@ -32,7 +32,7 @@ export interface MapConfigV2 { version: 2; settings: MapSettingsV2; nodes: MapNo
 export type MapConfig = MapConfigV1 | MapConfigV2;
 export interface NodeState extends MapNode { force: number; }
 export interface Packet { force: number; arrivalAt: number; }
-export interface Transport extends MapTransport { id: string; roadId: string; active: boolean; packets: Packet[]; }
+export interface Transport extends MapTransport { id: string; roadId: string; active: boolean; interdictedUntil: number; packets: Packet[]; }
 
 const roadKey = (a: string, b: string) => [a, b].sort().join(":");
 
@@ -45,6 +45,7 @@ export class Simulation {
   winner: Owner | null = null;
   private nextTransport = 1;
   private readonly siegeFormula: SiegeFormula;
+  private readonly nextInterdictionAt: Record<"player" | "enemy", number> = { player: 0, enemy: 0 };
 
   constructor(config: MapConfig) {
     this.config = upgradeMap(config);
@@ -57,11 +58,12 @@ export class Simulation {
   node(id: string): NodeState { const node = this.nodes.get(id); if (!node) throw new Error(`Unknown node: ${id}`); return node; }
   roadBetween(a: string, b: string): RoadV2 | undefined { return [...this.roads.values()].find((road) => roadKey(road.a, road.b) === roadKey(a, b)); }
   activeOnRoad(roadId: string): Transport | undefined { return this.transports.find((transport) => transport.active && transport.roadId === roadId); }
+  isTransportOperational(transport: Transport): boolean { return transport.active && transport.interdictedUntil <= this.time; }
   mode(transport: Transport): "support" | "attack" { return this.node(transport.target).owner === transport.owner ? "support" : "attack"; }
   isSupplied(nodeId: string): boolean {
     const node = this.node(nodeId);
     if (this.config.settings.rules.siegeSupport === "rooted") return this.suppliedNodes(node.owner).has(node.id);
-    return this.transports.some((transport) => transport.active && transport.target === node.id && this.mode(transport) === "support");
+    return this.transports.some((transport) => this.isTransportOperational(transport) && transport.target === node.id && this.mode(transport) === "support");
   }
   roadLength(road: RoadV2): number { const a = this.node(road.a); const b = this.node(road.b); return Math.hypot(a.x - b.x, a.y - b.y); }
   travelSeconds(road: RoadV2): number { return this.roadLength(road) * this.config.settings.secondsPerDistanceUnit * road.travelTimeMultiplier; }
@@ -71,7 +73,7 @@ export class Simulation {
     if (this.winner || owner === "neutral" || this.node(source).owner !== owner) return null;
     const road = this.roadBetween(source, target);
     if (!road || this.activeOnRoad(road.id)) return null;
-    const transport: Transport = { id: `transport-${this.nextTransport++}`, source, target, owner, roadId: road.id, active: true, packets: [] };
+    const transport: Transport = { id: `transport-${this.nextTransport++}`, source, target, owner, roadId: road.id, active: true, interdictedUntil: 0, packets: [] };
     this.transports.push(transport);
     return transport;
   }
@@ -82,6 +84,19 @@ export class Simulation {
     transport.active = false;
     transport.packets = [];
     return true;
+  }
+
+  interdictTransport(id: string, owner: "player" | "enemy"): boolean {
+    if (this.winner || !this.config.settings.rules.interdiction.enabled || this.interdictionReadyIn(owner) > 0) return false;
+    const transport = this.transports.find((candidate) => candidate.id === id);
+    if (!transport || transport.owner === owner || !this.isTransportOperational(transport)) return false;
+    transport.interdictedUntil = this.time + this.config.settings.rules.interdiction.durationSeconds;
+    this.nextInterdictionAt[owner] = this.time + this.config.settings.rules.interdiction.cooldownSeconds;
+    return true;
+  }
+
+  interdictionReadyIn(owner: "player" | "enemy"): number {
+    return Math.max(0, this.nextInterdictionAt[owner] - this.time);
   }
 
   step(dt = this.config.settings.logicTickSeconds): void {
@@ -128,7 +143,7 @@ export class Simulation {
       ])
       : undefined;
     for (const node of this.nodes.values()) {
-      const targeting = this.transports.filter((transport) => transport.active && transport.target === node.id);
+      const targeting = this.transports.filter((transport) => this.isTransportOperational(transport) && transport.target === node.id);
       const attackers = targeting.filter((transport) => this.mode(transport) === "attack");
       const supporters = targeting.filter((transport) => this.mode(transport) === "support");
       const supplied = rootedSupply ? rootedSupply.get(node.owner)!.has(node.id) : supporters.length > 0;
@@ -149,7 +164,7 @@ export class Simulation {
     while (changed) {
       changed = false;
       for (const transport of this.transports) {
-        if (!transport.active || transport.owner !== owner || this.mode(transport) !== "support" || !supplied.has(transport.source) || supplied.has(transport.target)) continue;
+        if (!this.isTransportOperational(transport) || transport.owner !== owner || this.mode(transport) !== "support" || !supplied.has(transport.source) || supplied.has(transport.target)) continue;
         supplied.add(transport.target);
         changed = true;
       }
@@ -159,7 +174,7 @@ export class Simulation {
 
   private dispatchPackets(dt: number): void {
     for (const transport of this.transports) {
-      if (!transport.active) continue;
+      if (!this.isTransportOperational(transport)) continue;
       const source = this.node(transport.source);
       const road = this.roads.get(transport.roadId)!;
       const force = Math.min(source.force, this.throughput(road) * dt);
@@ -201,10 +216,8 @@ function validateVersion2Rules(value: unknown): void {
   if (!isFiniteNumber(value.computerAI.reserveForce) || value.computerAI.reserveForce < 0) throw new Error("computerAI reserveForce must be a number greater than or equal to 0");
   if (!isRecord(value.fogOfWar)) throw new Error("fogOfWar rules must be a JSON object");
   if (typeof value.fogOfWar.enabled !== "boolean") throw new Error("fogOfWar enabled must be true or false");
-  if (value.fogOfWar.enabled) throw new Error("Fog of war is not implemented yet; fogOfWar enabled must be false");
   if (!isRecord(value.interdiction)) throw new Error("interdiction rules must be a JSON object");
   if (typeof value.interdiction.enabled !== "boolean") throw new Error("interdiction enabled must be true or false");
-  if (value.interdiction.enabled) throw new Error("Interdiction is not implemented yet; interdiction enabled must be false");
   for (const key of ["durationSeconds", "cooldownSeconds"] as const) {
     if (!isFiniteNumber(value.interdiction[key]) || value.interdiction[key] <= 0) throw new Error(`interdiction ${key} must be a number greater than 0`);
   }
